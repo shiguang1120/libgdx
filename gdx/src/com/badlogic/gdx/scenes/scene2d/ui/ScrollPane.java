@@ -599,7 +599,8 @@ public class ScrollPane extends WidgetGroup {
 		}
 
 		// Render scrollbars and knobs on top if they will be visible
-		float alpha = color.a * parentAlpha * Interpolation.fade.apply(fadeAlpha / fadeAlphaSeconds);
+		float alpha = color.a * parentAlpha;
+		if (fadeScrollBars) alpha *= Interpolation.fade.apply(fadeAlpha / fadeAlphaSeconds);
 		batch.setColor(color.r, color.g, color.b, color.a * parentAlpha);
 		drawScrollBars(batch, color.r, color.g, color.b, alpha);
 
@@ -645,33 +646,37 @@ public class ScrollPane extends WidgetGroup {
 	}
 
 	public float getPrefWidth () {
+		float width = 0;
 		if (widget instanceof Layout) {
-			float width = ((Layout)widget).getPrefWidth();
-			if (style.background != null) width += style.background.getLeftWidth() + style.background.getRightWidth();
-			if (forceScrollY) {
-				float scrollbarWidth = 0;
-				if (style.vScrollKnob != null) scrollbarWidth = style.vScrollKnob.getMinWidth();
-				if (style.vScroll != null) scrollbarWidth = Math.max(scrollbarWidth, style.vScroll.getMinWidth());
-				width += scrollbarWidth;
-			}
-			return width;
+			validate();
+			width = ((Layout)widget).getPrefWidth();
+		} else if (widget != null) //
+			width = widget.getWidth();
+		if (style.background != null) width += style.background.getLeftWidth() + style.background.getRightWidth();
+		if (scrollY) {
+			float scrollbarWidth = 0;
+			if (style.vScrollKnob != null) scrollbarWidth = style.vScrollKnob.getMinWidth();
+			if (style.vScroll != null) scrollbarWidth = Math.max(scrollbarWidth, style.vScroll.getMinWidth());
+			width += scrollbarWidth;
 		}
-		return 150;
+		return width;
 	}
 
 	public float getPrefHeight () {
+		float height = 0;
 		if (widget instanceof Layout) {
-			float height = ((Layout)widget).getPrefHeight();
-			if (style.background != null) height += style.background.getTopHeight() + style.background.getBottomHeight();
-			if (forceScrollX) {
-				float scrollbarHeight = 0;
-				if (style.hScrollKnob != null) scrollbarHeight = style.hScrollKnob.getMinHeight();
-				if (style.hScroll != null) scrollbarHeight = Math.max(scrollbarHeight, style.hScroll.getMinHeight());
-				height += scrollbarHeight;
-			}
-			return height;
+			validate();
+			height = ((Layout)widget).getPrefHeight();
+		} else if (widget != null) //
+			height = widget.getHeight();
+		if (style.background != null) height += style.background.getTopHeight() + style.background.getBottomHeight();
+		if (scrollX) {
+			float scrollbarHeight = 0;
+			if (style.hScrollKnob != null) scrollbarHeight = style.hScrollKnob.getMinHeight();
+			if (style.hScroll != null) scrollbarHeight = Math.max(scrollbarHeight, style.hScroll.getMinHeight());
+			height += scrollbarHeight;
 		}
-		return 150;
+		return height;
 	}
 
 	public float getMinWidth () {
@@ -1096,9 +1101,8 @@ public class ScrollPane extends WidgetGroup {
 	}
 
 	public void drawDebug (ShapeRenderer shapes) {
-		shapes.flush();
+		drawDebugBounds(shapes);
 		applyTransform(shapes, computeTransform());
-		shapes.flush();
 		if (clipBegin(widgetAreaBounds.x, widgetAreaBounds.y, widgetAreaBounds.width, widgetAreaBounds.height)) {
 			drawDebugChildren(shapes);
 			shapes.flush();
