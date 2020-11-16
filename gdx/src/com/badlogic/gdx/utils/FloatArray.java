@@ -122,7 +122,7 @@ public class FloatArray {
 	public void addAll (float[] array, int offset, int length) {
 		float[] items = this.items;
 		int sizeNeeded = size + length;
-		if (sizeNeeded > items.length) items = resize(Math.max(8, (int)(sizeNeeded * 1.75f)));
+		if (sizeNeeded > items.length) items = resize(Math.max(Math.max(8, sizeNeeded), (int)(size * 1.75f)));
 		System.arraycopy(array, offset, items, size, length);
 		size += length;
 	}
@@ -142,9 +142,21 @@ public class FloatArray {
 		items[index] += value;
 	}
 
+	public void incr (float value) {
+		float[] items = this.items;
+		for (int i = 0, n = size; i < n; i++)
+			items[i] += value;
+	}
+
 	public void mul (int index, float value) {
 		if (index >= size) throw new IndexOutOfBoundsException("index can't be >= size: " + index + " >= " + size);
 		items[index] *= value;
+	}
+
+	public void mul (float value) {
+		float[] items = this.items;
+		for (int i = 0, n = size; i < n; i++)
+			items[i] *= value;
 	}
 
 	public void insert (int index, float value) {
@@ -157,6 +169,16 @@ public class FloatArray {
 			items[size] = items[index];
 		size++;
 		items[index] = value;
+	}
+
+	/** Inserts the specified number of items at the specified index. The new items will have values equal to the values at those
+	 * indices before the insertion. */
+	public void insertRange (int index, int count) {
+		if (index > size) throw new IndexOutOfBoundsException("index can't be > size: " + index + " > " + size);
+		int sizeNeeded = size + count;
+		if (sizeNeeded > items.length) items = resize(Math.max(Math.max(8, sizeNeeded), (int)(size * 1.75f)));
+		System.arraycopy(items, index, items, index + count, size - index);
+		size = sizeNeeded;
 	}
 
 	public void swap (int first, int second) {
@@ -183,7 +205,7 @@ public class FloatArray {
 		return -1;
 	}
 
-	public int lastIndexOf (char value) {
+	public int lastIndexOf (float value) {
 		float[] items = this.items;
 		for (int i = size - 1; i >= 0; i--)
 			if (items[i] == value) return i;
@@ -216,18 +238,17 @@ public class FloatArray {
 
 	/** Removes the items between the specified indices, inclusive. */
 	public void removeRange (int start, int end) {
-		if (end >= size) throw new IndexOutOfBoundsException("end can't be >= size: " + end + " >= " + size);
+		int n = size;
+		if (end >= n) throw new IndexOutOfBoundsException("end can't be >= size: " + end + " >= " + size);
 		if (start > end) throw new IndexOutOfBoundsException("start can't be > end: " + start + " > " + end);
-		float[] items = this.items;
-		int count = end - start + 1;
+		int count = end - start + 1, lastIndex = n - count;
 		if (ordered)
-			System.arraycopy(items, start + count, items, start, size - (start + count));
+			System.arraycopy(items, start + count, items, start, n - (start + count));
 		else {
-			int lastIndex = this.size - 1;
-			for (int i = 0; i < count; i++)
-				items[start + i] = items[lastIndex - i];
+			int i = Math.max(lastIndex, end + 1);
+			System.arraycopy(items, i, items, start, n - i);
 		}
-		size -= count;
+		size = n - count;
 	}
 
 	/** Removes from this array all of elements contained in the specified array.
@@ -293,7 +314,7 @@ public class FloatArray {
 	public float[] ensureCapacity (int additionalCapacity) {
 		if (additionalCapacity < 0) throw new IllegalArgumentException("additionalCapacity must be >= 0: " + additionalCapacity);
 		int sizeNeeded = size + additionalCapacity;
-		if (sizeNeeded > items.length) resize(Math.max(8, sizeNeeded));
+		if (sizeNeeded > items.length) resize(Math.max(Math.max(8, sizeNeeded), (int)(size * 1.75f)));
 		return items;
 	}
 
@@ -361,7 +382,7 @@ public class FloatArray {
 		float[] items = this.items;
 		int h = 1;
 		for (int i = 0, n = size; i < n; i++)
-			h = h * 31 + Float.floatToIntBits(items[i]);
+			h = h * 31 + NumberUtils.floatToRawIntBits(items[i]);
 		return h;
 	}
 

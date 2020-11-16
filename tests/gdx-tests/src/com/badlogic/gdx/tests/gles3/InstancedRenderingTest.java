@@ -24,11 +24,13 @@ import com.badlogic.gdx.graphics.VertexAttribute;
 import com.badlogic.gdx.graphics.VertexAttributes.Usage;
 import com.badlogic.gdx.graphics.glutils.ShaderProgram;
 import com.badlogic.gdx.tests.utils.GdxTest;
+import com.badlogic.gdx.tests.utils.GdxTestConfig;
 import com.badlogic.gdx.utils.BufferUtils;
 import com.badlogic.gdx.utils.GdxRuntimeException;
 
 import java.nio.FloatBuffer;
 
+@GdxTestConfig(requireGL30=true)
 public class InstancedRenderingTest extends GdxTest {
 
 	ShaderProgram shader;
@@ -42,7 +44,8 @@ public class InstancedRenderingTest extends GdxTest {
 		if (Gdx.gl30 == null) {
 			throw new GdxRuntimeException("GLES 3.0 profile required for this test");
 		}
-
+		ShaderProgram.prependVertexCode = "#version 300 es\n";
+		ShaderProgram.prependFragmentCode = "#version 300 es\n";
 		shader = new ShaderProgram(Gdx.files.internal("data/shaders/instanced-rendering.vert"), Gdx.files.internal("data/shaders/instanced-rendering.frag"));
 		if (!shader.isCompiled()) {
 			throw new GdxRuntimeException("Shader compile error: " + shader.getLog());
@@ -84,8 +87,7 @@ public class InstancedRenderingTest extends GdxTest {
 		Gdx.gl.glClearColor(0.2f, 0.2f, 0.2f, 1f);
 		Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
-		shader.begin();
+		shader.bind();
 		mesh.render(shader, GL30.GL_TRIANGLES);
-		shader.end();
 	}
 }

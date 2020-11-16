@@ -24,6 +24,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.SynchronousQueue;
@@ -138,9 +139,10 @@ public class NetJavaImpl {
 				60L, TimeUnit.SECONDS,
 				new SynchronousQueue<Runnable>(),
 				new ThreadFactory() {
+					AtomicInteger threadID = new AtomicInteger();
 					@Override
 					public Thread newThread(Runnable r) {
-						Thread thread = new Thread(r, "NetThread");
+						Thread thread = new Thread(r, "NetThread" + threadID.getAndIncrement());
 						thread.setDaemon(true);
 						return thread;
 					}
@@ -159,7 +161,13 @@ public class NetJavaImpl {
 			final String method = httpRequest.getMethod();
 			URL url;
 
-			if (method.equalsIgnoreCase(HttpMethods.GET)) {
+			final boolean doInput = !method.equalsIgnoreCase(HttpMethods.HEAD);
+			// should be enabled to upload data.
+			final boolean doingOutPut = method.equalsIgnoreCase(HttpMethods.POST)
+					|| method.equalsIgnoreCase(HttpMethods.PUT)
+					|| method.equalsIgnoreCase(HttpMethods.PATCH);
+
+			if (method.equalsIgnoreCase(HttpMethods.GET) || method.equalsIgnoreCase(HttpMethods.HEAD)) {
 				String queryString = "";
 				String value = httpRequest.getContent();
 				if (value != null && !"".equals(value)) queryString = "?" + value;
@@ -169,10 +177,8 @@ public class NetJavaImpl {
 			}
 
 			final HttpURLConnection connection = (HttpURLConnection)url.openConnection();
-			// should be enabled to upload data.
-			final boolean doingOutPut = method.equalsIgnoreCase(HttpMethods.POST) || method.equalsIgnoreCase(HttpMethods.PUT) || method.equalsIgnoreCase(HttpMethods.PATCH);
 			connection.setDoOutput(doingOutPut);
-			connection.setDoInput(true);
+			connection.setDoInput(doInput);
 			connection.setRequestMethod(method);
 			HttpURLConnection.setFollowRedirects(httpRequest.getFollowRedirects());
 
