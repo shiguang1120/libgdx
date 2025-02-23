@@ -1,12 +1,12 @@
 /*******************************************************************************
  * Copyright 2011 See AUTHORS file.
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *   http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -16,6 +16,7 @@
 
 package com.badlogic.gdx.backends.lwjgl.audio;
 
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
 
@@ -34,7 +35,6 @@ import static org.lwjgl.openal.AL10.*;
 public abstract class OpenALMusic implements Music {
 	static private final int bufferSize = 4096 * 10;
 	static private final int bufferCount = 3;
-	static private final int bytesPerSample = 2;
 	static private final byte[] tempBytes = new byte[bufferSize];
 	static private final ByteBuffer tempBuffer = BufferUtils.createByteBuffer(bufferSize);
 
@@ -59,10 +59,15 @@ public abstract class OpenALMusic implements Music {
 		this.onCompletionListener = null;
 	}
 
-	protected void setup (int channels, int sampleRate) {
+	/** Prepare our music for playback!
+	 * @param channels The number of channels for the music. Most commonly 1 (for mono) or 2 (for stereo).
+	 * @param bitDepth The number of bits in each sample. Normally 16. Can also be 8, 32 or sometimes 64.
+	 * @param sampleRate The number of samples to be played each second. Commonly 44100; can be anything within reason. */
+	protected void setup (int channels, int bitDepth, int sampleRate) {
 		this.format = channels > 1 ? AL_FORMAT_STEREO16 : AL_FORMAT_MONO16;
+		if (bitDepth == 8) this.format--; // Use 8-bit AL_FORMAT instead.
 		this.sampleRate = sampleRate;
-		maxSecondsPerBuffer = (float)bufferSize / (bytesPerSample * channels * sampleRate);
+		maxSecondsPerBuffer = (float)bufferSize / (bitDepth / 8 * channels * sampleRate);
 	}
 
 	public void play () {
@@ -75,6 +80,7 @@ public abstract class OpenALMusic implements Music {
 
 			if (buffers == null) {
 				buffers = BufferUtils.createIntBuffer(bufferCount);
+				alGetError();
 				alGenBuffers(buffers);
 				int errorCode = alGetError();
 				if (errorCode != AL_NO_ERROR)
@@ -82,6 +88,8 @@ public abstract class OpenALMusic implements Music {
 			}
 			alSourcei(sourceID, AL_LOOPING, AL_FALSE);
 			setPan(pan, volume);
+
+			alGetError();
 
 			boolean filled = false; // Check if there's anything to actually play.
 			for (int i = 0; i < bufferCount; i++) {
@@ -135,7 +143,9 @@ public abstract class OpenALMusic implements Music {
 		return isLooping;
 	}
 
+	/** @param volume Must be > 0. */
 	public void setVolume (float volume) {
+		if (volume < 0) throw new IllegalArgumentException("volume cannot be < 0: " + volume);
 		this.volume = volume;
 		if (audio.noDevice) return;
 		if (sourceID != -1) alSourcef(sourceID, AL_GAIN, volume);
@@ -170,8 +180,10 @@ public abstract class OpenALMusic implements Music {
 			renderedSeconds = 0;
 		}
 		while (renderedSeconds < (position - maxSecondsPerBuffer)) {
-			if (read(tempBytes) <= 0) break;
-			renderedSeconds += maxSecondsPerBuffer;
+			int length = read(tempBytes);
+			if (length <= 0) break;
+			float currentBufferSeconds = maxSecondsPerBuffer * (float)length / (float)bufferSize;
+			renderedSeconds += currentBufferSeconds;
 		}
 		renderedSecondsQueue.add(renderedSeconds);
 		boolean filled = false;
@@ -245,7 +257,7 @@ public abstract class OpenALMusic implements Music {
 	}
 
 	private boolean fill (int bufferID) {
-		tempBuffer.clear();
+		((Buffer)tempBuffer).clear();
 		int length = read(tempBytes);
 		if (length <= 0) {
 			if (isLooping) {
@@ -262,7 +274,7 @@ public abstract class OpenALMusic implements Music {
 		float currentBufferSeconds = maxSecondsPerBuffer * (float)length / (float)bufferSize;
 		renderedSecondsQueue.insert(0, previousLoadedSeconds + currentBufferSeconds);
 
-		tempBuffer.put(tempBytes, 0, length).flip();
+		((Buffer)tempBuffer.put(tempBytes, 0, length)).flip();
 		alBufferData(bufferID, format, tempBuffer, sampleRate);
 		return true;
 	}

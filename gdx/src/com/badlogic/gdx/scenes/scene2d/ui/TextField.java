@@ -105,7 +105,7 @@ public class TextField extends Widget implements Disableable {
 
 	protected float fontOffset, textHeight, textOffset;
 	float renderOffset;
-	private int visibleTextStart, visibleTextEnd;
+	protected int visibleTextStart, visibleTextEnd;
 	private int maxLength;
 
 	boolean focused;
@@ -238,6 +238,7 @@ public class TextField extends Widget implements Disableable {
 		float[] glyphPositions = this.glyphPositions.items;
 
 		// Check if the cursor has gone out the left or right side of the visible area and adjust renderOffset.
+		cursor = MathUtils.clamp(cursor, 0, glyphCount - 1);
 		float distance = glyphPositions[Math.max(0, cursor - 1)] + renderOffset;
 		if (distance <= 0)
 			renderOffset -= distance;
@@ -341,7 +342,7 @@ public class TextField extends Widget implements Disableable {
 
 		float yOffset = font.isFlipped() ? -textHeight : 0;
 		if (displayText.length() == 0) {
-			if (!focused && messageText != null) {
+			if ((!focused || disabled) && messageText != null) {
 				BitmapFont messageFont = style.messageFont != null ? style.messageFont : font;
 				if (style.messageFontColor != null) {
 					messageFont.setColor(style.messageFontColor.r, style.messageFontColor.g, style.messageFontColor.b,
@@ -351,8 +352,12 @@ public class TextField extends Widget implements Disableable {
 				drawMessageText(batch, messageFont, x + bgLeftWidth, y + textY + yOffset, width - bgLeftWidth - bgRightWidth);
 			}
 		} else {
+			BitmapFontData data = font.getData();
+			boolean markupEnabled = data.markupEnabled;
+			data.markupEnabled = false;
 			font.setColor(fontColor.r, fontColor.g, fontColor.b, fontColor.a * color.a * parentAlpha);
 			drawText(batch, font, x + bgLeftWidth, y + textY + yOffset);
+			data.markupEnabled = markupEnabled;
 		}
 		if (!disabled && cursorOn && cursorPatch != null) {
 			drawCursor(cursorPatch, batch, font, x + bgLeftWidth, y + textY);
@@ -417,7 +422,11 @@ public class TextField extends Widget implements Disableable {
 		} else
 			displayText = newDisplayText;
 
+		boolean markupEnabled = data.markupEnabled;
+		data.markupEnabled = false;
 		layout.setText(font, displayText.toString().replace('\r', ' ').replace('\n', ' '));
+		data.markupEnabled = markupEnabled;
+
 		glyphPositions.clear();
 		float x = 0;
 		if (layout.runs.size > 0) {
@@ -583,6 +592,10 @@ public class TextField extends Widget implements Disableable {
 	/** If true (the default), tab/shift+tab will move to the next text field. */
 	public void setFocusTraversal (boolean focusTraversal) {
 		this.focusTraversal = focusTraversal;
+	}
+
+	public boolean getFocusTraversal () {
+		return focusTraversal;
 	}
 
 	/** @return May be null. */
@@ -1073,7 +1086,7 @@ public class TextField extends Widget implements Disableable {
 						if (time - 750 > lastChangeTime) undoText = oldText;
 						lastChangeTime = time;
 						updateDisplayText();
-					} else
+					} else if (!text.equals(oldText)) // Keep cursor movement if the text is the same.
 						cursor = oldCursor;
 				}
 			}

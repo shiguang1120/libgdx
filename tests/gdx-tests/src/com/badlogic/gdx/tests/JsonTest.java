@@ -2,13 +2,8 @@
 package com.badlogic.gdx.tests;
 
 import com.badlogic.gdx.tests.utils.GdxTest;
-import com.badlogic.gdx.utils.Array;
-import com.badlogic.gdx.utils.ArrayMap;
-import com.badlogic.gdx.utils.Json;
+import com.badlogic.gdx.utils.*;
 import com.badlogic.gdx.utils.JsonWriter.OutputType;
-import com.badlogic.gdx.utils.LongMap;
-import com.badlogic.gdx.utils.ObjectFloatMap;
-import com.badlogic.gdx.utils.ObjectMap;
 import com.badlogic.gdx.utils.reflect.ArrayReflection;
 
 import java.util.ArrayList;
@@ -62,7 +57,73 @@ public class JsonTest extends GdxTest {
 		test.stringFloatMap.put("point one", 0.1f);
 		test.stringFloatMap.put("point double oh seven", 0.007f);
 		test.someEnum = SomeEnum.b;
+
+		// IntIntMap can be written, but only as a normal object, not as a kind of map.
+		test.intsToIntsUnboxed = new IntIntMap();
+		test.intsToIntsUnboxed.put(102, 14);
+		test.intsToIntsUnboxed.put(107, 1);
+		test.intsToIntsUnboxed.put(10, 2);
+		test.intsToIntsUnboxed.put(2, 1);
+		test.intsToIntsUnboxed.put(7, 3);
+		test.intsToIntsUnboxed.put(101, 63);
+		test.intsToIntsUnboxed.put(4, 2);
+		test.intsToIntsUnboxed.put(106, 4);
+		test.intsToIntsUnboxed.put(1, 1);
+		test.intsToIntsUnboxed.put(103, 2);
+		test.intsToIntsUnboxed.put(6, 2);
+		test.intsToIntsUnboxed.put(3, 1);
+		test.intsToIntsUnboxed.put(105, 6);
+		test.intsToIntsUnboxed.put(8, 2);
+		// The above "should" print like this:
+		// {size:14,keyTable:[0,0,102,0,0,0,0,0,107,0,0,10,0,0,0,2,0,0,0,0,7,0,0,0,0,0,101,0,0,0,4,0,106,0,0,0,0,0,0,1,0,0,103,0,0,6,0,0,0,0,0,0,0,0,3,0,0,105,0,0,8,0,0,0],valueTable:[0,0,14,0,0,0,0,0,1,0,0,2,0,0,0,1,0,0,0,0,3,0,0,0,0,0,63,0,0,0,2,0,4,0,0,0,0,0,0,1,0,0,2,0,0,2,0,0,0,0,0,0,0,0,1,0,0,6,0,0,2,0,0,0]}
+		// This is potentially correct, but also quite large considering the contents.
+		// It would be nice to have IntIntMap look like IntMap<Integer> does, below.
+
+		// IntMap gets special treatment and is written as a kind of map.
+		test.intsToIntsBoxed = new IntMap<Integer>();
+		test.intsToIntsBoxed.put(102, 14);
+		test.intsToIntsBoxed.put(107, 1);
+		test.intsToIntsBoxed.put(10, 2);
+		test.intsToIntsBoxed.put(2, 1);
+		test.intsToIntsBoxed.put(7, 3);
+		test.intsToIntsBoxed.put(101, 63);
+		test.intsToIntsBoxed.put(4, 2);
+		test.intsToIntsBoxed.put(106, 4);
+		test.intsToIntsBoxed.put(1, 1);
+		test.intsToIntsBoxed.put(103, 2);
+		test.intsToIntsBoxed.put(6, 2);
+		test.intsToIntsBoxed.put(3, 1);
+		test.intsToIntsBoxed.put(105, 6);
+		test.intsToIntsBoxed.put(8, 2);
+		// The above should print like this:
+		// {102:14,107:1,10:2,2:1,7:3,101:63,4:2,106:4,1:1,103:2,6:2,3:1,105:6,8:2}
+
 		roundTrip(test);
+		int sum = 0;
+		// iterate over an IntIntMap so one of its Entries is instantiated
+		for (IntIntMap.Entry e : test.intsToIntsUnboxed) {
+			sum += e.value + 1;
+		}
+		// also iterate over an Array, which does not have any problems
+		String concat = "";
+		for (String s : test.stringArray) {
+			concat += s;
+		}
+		// by round-tripping again, we verify that the Entries is correctly skipped
+		roundTrip(test);
+		int sum2 = 0;
+		// check and make sure that no entries are skipped over or incorrectly added
+		for (IntIntMap.Entry e : test.intsToIntsUnboxed) {
+			sum2 += e.value + 1;
+		}
+		String concat2 = "";
+		// also check the Array again
+		for (String s : test.stringArray) {
+			concat2 += s;
+		}
+
+		System.out.println("before: " + sum + ", after: " + sum2);
+		System.out.println("before: " + concat + ", after: " + concat2);
 
 		test.someEnum = null;
 		roundTrip(test);
@@ -106,6 +167,80 @@ public class JsonTest extends GdxTest {
 		equals(json.toJson(Array.with("1", "2", "3"), null, String.class), "[1,2,3]");
 		equals(json.toJson(Array.with(" 1", "2 ", " 3 "), null, String.class), "[\" 1\",\"2 \",\" 3 \"]");
 		equals(json.toJson(Array.with("1", "", "3"), null, String.class), "[1,\"\",3]");
+
+		// Show JsonSkimmer methods are called for all JSON parts:
+		String text = "{outer:{name1:{},z:{a:true,name2:[value,{\"ok\":v},0 ,1]}}}";
+		System.out.println(text);
+		new JsonSkimmer() {
+			int indent;
+			boolean object;
+
+			void indent () {
+				for (int i = 0; i < indent; i++)
+					System.out.print("   ");
+			}
+
+			@Override
+			protected void push (@Null String name, boolean object) {
+				indent();
+				if (object)
+					System.out.println(name != null ? name + ": {" : "{");
+				else
+					System.out.println(name != null ? name + ": [" : "[");
+				this.object = object;
+				indent++;
+			}
+
+			@Override
+			protected void pop () {
+				indent--;
+				indent();
+				System.out.println(object ? '}' : ']');
+			}
+
+			@Override
+			protected void value (String name, String value, boolean unquoted) {
+				indent();
+				System.out.println(name != null ? name + ": " + value : value);
+			}
+		}.parse(text);
+
+		// JsonSkimmer usage example/test:
+		final Array values = new Array();
+		new JsonSkimmer() {
+			int level;
+			String id;
+			float watts;
+
+			@Override
+			protected void push (String name, boolean object) {
+				level++;
+			}
+
+			@Override
+			protected void pop () {
+				if (level == 2) {
+					values.add(id);
+					values.add(watts);
+					id = null;
+					watts = 0;
+				}
+				level--;
+			}
+
+			@Override
+			protected void value (String name, String value, boolean unquoted) {
+				if (level == 2) {
+					if (name.equals("eid"))
+						id = value;
+					else if (name.equals("activePower")) //
+						watts = Float.parseFloat(value);
+				}
+			}
+		}.parse(
+			"[{\"eid\": 704643328, \"timestamp\": 1686961582, \"actEnergyDlvd\": 2485013.736, \"actEnergyRcvd\": 11887.499, \"apparentEnergy\": 3054495.271, \"reactEnergyLagg\": 795783.451, \"reactEnergyLead\": 0.398, \"instantaneousDemand\": 0.543, \"activePower\": 0.543, \"apparentPower\": 254.202, \"reactivePower\": 248.806, \"pwrFactor\": 0.0, \"voltage\": 244.004, \"current\": 1.043, \"freq\": 50.125, \"channels\": [{\"eid\": 1778385169, \"timestamp\": 1686961582, \"actEnergyDlvd\": 2485013.736, \"actEnergyRcvd\": 11887.499, \"apparentEnergy\": 3054495.271, \"reactEnergyLagg\": 795783.451, \"reactEnergyLead\": 0.398, \"instantaneousDemand\": 0.543, \"activePower\": 0.543, \"apparentPower\": 254.202, \"reactivePower\": 248.806, \"pwrFactor\": 0.0, \"voltage\": 244.004, \"current\": 1.043, \"freq\": 50.125}, {\"eid\": 1778385170, \"timestamp\": 1686961582, \"actEnergyDlvd\": 9.464, \"actEnergyRcvd\": 1998.651, \"apparentEnergy\": 3232.019, \"reactEnergyLagg\": 301.011, \"reactEnergyLead\": 2.645, \"instantaneousDemand\": -0.1, \"activePower\": -0.1, \"apparentPower\": 0.75, \"reactivePower\": -0.0, \"pwrFactor\": 0.0, \"voltage\": 5.478, \"current\": 0.137, \"freq\": 50.125}, {\"eid\": 1778385171, \"timestamp\": 1686961582, \"actEnergyDlvd\": 0.002, \"actEnergyRcvd\": 4766.67, \"apparentEnergy\": 306.341, \"reactEnergyLagg\": 286.551, \"reactEnergyLead\": 0.293, \"instantaneousDemand\": -0.0, \"activePower\": -0.0, \"apparentPower\": -0.0, \"reactivePower\": 0.0, \"pwrFactor\": 0.0, \"voltage\": 9.968, \"current\": 0.0, \"freq\": 50.125}]}, {\"eid\": 704643584, \"timestamp\": 1686961582, \"actEnergyDlvd\": 1749556.395, \"actEnergyRcvd\": 1601637.637, \"apparentEnergy\": 5069079.041, \"reactEnergyLagg\": 17.665, \"reactEnergyLead\": 2831887.274, \"instantaneousDemand\": 432.435, \"activePower\": 432.435, \"apparentPower\": 971.846, \"reactivePower\": -793.38, \"pwrFactor\": 0.444, \"voltage\": 244.187, \"current\": 3.981, \"freq\": 50.125, \"channels\": [{\"eid\": 1778385425, \"timestamp\": 1686961582, \"actEnergyDlvd\": 1749556.395, \"actEnergyRcvd\": 1601637.637, \"apparentEnergy\": 5069079.041, \"reactEnergyLagg\": 17.665, \"reactEnergyLead\": 2831887.274, \"instantaneousDemand\": 432.435, \"activePower\": 432.435, \"apparentPower\": 971.846, \"reactivePower\": -793.38, \"pwrFactor\": 0.444, \"voltage\": 244.187, \"current\": 3.981, \"freq\": 50.125}, {\"eid\": 1778385426, \"timestamp\": 1686961582, \"actEnergyDlvd\": 0.002, \"actEnergyRcvd\": 6887.628, \"apparentEnergy\": 2848.524, \"reactEnergyLagg\": 273.934, \"reactEnergyLead\": 0.183, \"instantaneousDemand\": -0.285, \"activePower\": -0.285, \"apparentPower\": 0.773, \"reactivePower\": 0.0, \"pwrFactor\": -1.0, \"voltage\": 6.849, \"current\": 0.112, \"freq\": 50.125}, {\"eid\": 1778385427, \"timestamp\": 1686961582, \"actEnergyDlvd\": 0.005, \"actEnergyRcvd\": 10679.623, \"apparentEnergy\": 2662.289, \"reactEnergyLagg\": 274.727, \"reactEnergyLead\": 0.57, \"instantaneousDemand\": -0.332, \"activePower\": -0.332, \"apparentPower\": 0.711, \"reactivePower\": 0.074, \"pwrFactor\": 0.0, \"voltage\": 6.283, \"current\": 0.113, \"freq\": 50.125}]}]");
+		System.out.println(values);
+		if (!values.equals(Array.with("704643328", 0.543f, "704643584", 432.435f))) throw new RuntimeException();
 
 		System.out.println();
 		System.out.println("Success!");
@@ -215,6 +350,8 @@ public class JsonTest extends GdxTest {
 		public LongMap<String> longMap;
 		public ObjectFloatMap<String> stringFloatMap;
 		public SomeEnum someEnum;
+		public IntMap<Integer> intsToIntsBoxed;
+		public IntIntMap intsToIntsUnboxed;
 
 		public boolean equals (Object obj) {
 			if (this == obj) return true;
@@ -271,6 +408,31 @@ public class JsonTest extends GdxTest {
 			if (stringArray != other.stringArray) {
 				if (stringArray == null || other.stringArray == null) return false;
 				if (!stringArray.equals(other.stringArray)) return false;
+			}
+
+			if (objectArray != other.objectArray) {
+				if (objectArray == null || other.objectArray == null) return false;
+				if (!objectArray.equals(other.objectArray)) return false;
+			}
+
+			if (longMap != other.longMap) {
+				if (longMap == null || other.longMap == null) return false;
+				if (!longMap.equals(other.longMap)) return false;
+			}
+
+			if (stringFloatMap != other.stringFloatMap) {
+				if (stringFloatMap == null || other.stringFloatMap == null) return false;
+				if (!stringFloatMap.equals(other.stringFloatMap)) return false;
+			}
+
+			if (intsToIntsBoxed != other.intsToIntsBoxed) {
+				if (intsToIntsBoxed == null || other.intsToIntsBoxed == null) return false;
+				if (!intsToIntsBoxed.equals(other.intsToIntsBoxed)) return false;
+			}
+
+			if (intsToIntsUnboxed != other.intsToIntsUnboxed) {
+				if (intsToIntsUnboxed == null || other.intsToIntsUnboxed == null) return false;
+				if (!intsToIntsUnboxed.equals(other.intsToIntsUnboxed)) return false;
 			}
 
 			if (byteField != other.byteField) return false;

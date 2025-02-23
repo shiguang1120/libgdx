@@ -53,7 +53,7 @@ import com.badlogic.gdx.utils.reflect.ReflectionException;
  * regions in the atlas as ninepatches, sprites, drawables, etc. The get* methods return an instance of the object in the skin.
  * The new* methods return a copy of an instance in the skin.
  * <p>
- * See the <a href="https://github.com/libgdx/libgdx/wiki/Skin">documentation</a> for more.
+ * See the <a href="https://libgdx.com/wiki/graphics/2d/scene2d/skin">documentation</a> for more.
  * @author Nathan Sweet */
 public class Skin implements Disposable {
 	ObjectMap<Class, ObjectMap<String, Object>> resources = new ObjectMap();
@@ -239,7 +239,7 @@ public class Skin implements Disposable {
 	}
 
 	/** Returns a registered ninepatch. If no ninepatch is found but a region exists with the name, a ninepatch is created from the
-	 * region and stored in the skin. If the region is an {@link AtlasRegion} then the {@link AtlasRegion#splits} are used,
+	 * region and stored in the skin. If the region is an {@link AtlasRegion} then its split {@link AtlasRegion#values} are used,
 	 * otherwise the ninepatch will have the region as the center patch. */
 	public NinePatch getPatch (String name) {
 		NinePatch patch = optional(name, NinePatch.class);
@@ -248,10 +248,10 @@ public class Skin implements Disposable {
 		try {
 			TextureRegion region = getRegion(name);
 			if (region instanceof AtlasRegion) {
-				int[] splits = ((AtlasRegion)region).splits;
+				int[] splits = ((AtlasRegion)region).findValue("split");
 				if (splits != null) {
 					patch = new NinePatch(region, splits[0], splits[1], splits[2], splits[3]);
-					int[] pads = ((AtlasRegion)region).pads;
+					int[] pads = ((AtlasRegion)region).findValue("pad");
 					if (pads != null) patch.setPadding(pads[0], pads[1], pads[2], pads[3]);
 				}
 			}
@@ -298,7 +298,7 @@ public class Skin implements Disposable {
 			TextureRegion textureRegion = getRegion(name);
 			if (textureRegion instanceof AtlasRegion) {
 				AtlasRegion region = (AtlasRegion)textureRegion;
-				if (region.splits != null)
+				if (region.findValue("split") != null)
 					drawable = new NinePatchDrawable(getPatch(name));
 				else if (region.rotate || region.packedWidth != region.originalWidth || region.packedHeight != region.originalHeight)
 					drawable = new SpriteDrawable(getSprite(name));
@@ -532,9 +532,10 @@ public class Skin implements Disposable {
 		json.setSerializer(BitmapFont.class, new ReadOnlySerializer<BitmapFont>() {
 			public BitmapFont read (Json json, JsonValue jsonData, Class type) {
 				String path = json.readValue("file", String.class, jsonData);
-				int scaledSize = json.readValue("scaledSize", int.class, -1, jsonData);
+				float scaledSize = json.readValue("scaledSize", float.class, -1f, jsonData);
 				Boolean flip = json.readValue("flip", Boolean.class, false, jsonData);
 				Boolean markupEnabled = json.readValue("markupEnabled", Boolean.class, false, jsonData);
+				Boolean useIntegerPositions = json.readValue("useIntegerPositions", Boolean.class, true, jsonData);
 
 				FileHandle fontFile = skinFile.parent().child(path);
 				if (!fontFile.exists()) fontFile = Gdx.files.internal(path);
@@ -560,6 +561,7 @@ public class Skin implements Disposable {
 						}
 					}
 					font.getData().markupEnabled = markupEnabled;
+					font.setUseIntegerPositions(useIntegerPositions);
 					// Scaled size is the desired cap height to scale the font to.
 					if (scaledSize != -1) font.getData().setScale(scaledSize / font.getCapHeight());
 					return font;

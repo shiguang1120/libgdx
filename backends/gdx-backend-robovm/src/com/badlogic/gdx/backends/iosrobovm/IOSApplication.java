@@ -30,7 +30,6 @@ import org.robovm.apple.uikit.UIApplicationDelegateAdapter;
 import org.robovm.apple.uikit.UIApplicationLaunchOptions;
 import org.robovm.apple.uikit.UIDevice;
 import org.robovm.apple.uikit.UIUserInterfaceIdiom;
-import org.robovm.apple.uikit.UIInterfaceOrientation;
 import org.robovm.apple.uikit.UIPasteboard;
 import org.robovm.apple.uikit.UIScreen;
 import org.robovm.apple.uikit.UIViewController;
@@ -47,8 +46,6 @@ import com.badlogic.gdx.Input;
 import com.badlogic.gdx.LifecycleListener;
 import com.badlogic.gdx.Net;
 import com.badlogic.gdx.Preferences;
-import com.badlogic.gdx.backends.iosrobovm.objectal.OALAudioSession;
-import com.badlogic.gdx.backends.iosrobovm.objectal.OALSimpleAudio;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.Clipboard;
 
@@ -87,6 +84,8 @@ public class IOSApplication implements Application {
 		}
 	}
 
+	static final boolean IS_METALANGLE = false;
+
 	UIApplication uiApp;
 	UIWindow uiWindow;
 	ApplicationListener listener;
@@ -94,7 +93,7 @@ public class IOSApplication implements Application {
 	IOSApplicationConfiguration config;
 	IOSGraphics graphics;
 	IOSAudio audio;
-	IOSFiles files;
+	Files files;
 	IOSInput input;
 	IOSNet net;
 	int logLevel = Application.LOG_DEBUG;
@@ -138,7 +137,7 @@ public class IOSApplication implements Application {
 		this.graphics = createGraphics();
 		Gdx.gl = Gdx.gl20 = graphics.gl20;
 		Gdx.gl30 = graphics.gl30;
-		this.files = new IOSFiles();
+		this.files = createFiles();
 		this.audio = createAudio(config);
 		this.net = new IOSNet(this, config);
 
@@ -151,33 +150,52 @@ public class IOSApplication implements Application {
 		this.input.setupPeripherals();
 
 		this.uiWindow.setRootViewController(this.graphics.viewController);
+		this.graphics.updateSafeInsets();
+
 		Gdx.app.debug("IOSApplication", "created");
+
+		// Trigger first render, special case that is caught and returned
+		this.graphics.view.display();
+
+		listener.create();
+		listener.resize(this.graphics.getWidth(), this.graphics.getHeight());
+
+		// make sure the OpenGL view has contents before displaying it
+		this.graphics.view.display();
+
 		return true;
 	}
 
+	protected Files createFiles () {
+		return new IOSFiles();
+	}
+
 	protected IOSAudio createAudio (IOSApplicationConfiguration config) {
-		return new OALIOSAudio(config);
+		if (config.useAudio)
+			return new OALIOSAudio(config);
+		else
+			return new DisabledIOSAudio();
 	}
 
-	protected IOSGraphics createGraphics() {
-		 return new IOSGraphics(this, config, input, config.useGL30);
+	protected IOSGraphics createGraphics () {
+		return new IOSGraphics(this, config, input, config.useGL30);
 	}
 
-	protected IOSGraphics.IOSUIViewController createUIViewController (IOSGraphics graphics) {
-		return new IOSGraphics.IOSUIViewController(this, graphics);
+	protected IOSUIViewController createUIViewController (IOSGraphics graphics) {
+		return new IOSUIViewController(this, graphics);
 	}
 
-	protected IOSInput createInput() {
-		 return new DefaultIOSInput(this);
+	protected IOSInput createInput () {
+		return new DefaultIOSInput(this);
 	}
 
 	/** Returns device ppi using a best guess approach when device is unknown. Overwrite to customize strategy. */
-	protected int guessUnknownPpi() {
+	protected int guessUnknownPpi () {
 		int ppi;
 		if (UIDevice.getCurrentDevice().getUserInterfaceIdiom() == UIUserInterfaceIdiom.Pad)
-			ppi = 132 * (int) pixelsPerPoint;
+			ppi = 132 * (int)pixelsPerPoint;
 		else
-			ppi = 164 * (int) pixelsPerPoint;
+			ppi = 164 * (int)pixelsPerPoint;
 		error("IOSApplication", "Device PPI unknown. PPI value has been guessed to " + ppi + " but may be wrong");
 		return ppi;
 	}
@@ -220,7 +238,7 @@ public class IOSApplication implements Application {
 		final int backBufferHeight = (int)Math.round(screenHeight * pixelsPerPoint);
 
 		debug("IOSApplication", "Computed bounds are x=" + offsetX + " y=" + offsetY + " w=" + width + " h=" + height + " bbW= "
-					+ backBufferWidth + " bbH= " + backBufferHeight);
+			+ backBufferWidth + " bbH= " + backBufferHeight);
 
 		return lastScreenBounds = new IOSScreenBounds(offsetX, offsetY, width, height, backBufferWidth, backBufferHeight);
 	}
@@ -235,33 +253,18 @@ public class IOSApplication implements Application {
 
 	final void didBecomeActive (UIApplication uiApp) {
 		Gdx.app.debug("IOSApplication", "resumed");
-		// workaround for ObjectAL crash problem
-		// see: https://groups.google.com/forum/?fromgroups=#!topic/objectal-for-iphone/ubRWltp_i1Q
-		OALAudioSession audioSession = OALAudioSession.sharedInstance();
-		if (audioSession != null) {
-			audioSession.forceEndInterruption();
-		}
-		if (config.allowIpod) {
-			OALSimpleAudio audio = OALSimpleAudio.sharedInstance();
-			if (audio != null) {
-				audio.setUseHardwareIfAvailable(false);
-			}
-		}
+		audio.didBecomeActive();
 		graphics.makeCurrent();
 		graphics.resume();
 	}
 
 	final void willEnterForeground (UIApplication uiApp) {
-		// workaround for ObjectAL crash problem
-		// see: https://groups.google.com/forum/?fromgroups=#!topic/objectal-for-iphone/ubRWltp_i1Q
-		OALAudioSession audioSession = OALAudioSession.sharedInstance();
-		if (audioSession != null) {
-			audioSession.forceEndInterruption();
-		}
+		audio.willEnterForeground();
 	}
 
 	final void willResignActive (UIApplication uiApp) {
 		Gdx.app.debug("IOSApplication", "paused");
+		audio.willResignActive();
 		graphics.makeCurrent();
 		graphics.pause();
 		Gdx.gl.glFinish();
@@ -269,6 +272,7 @@ public class IOSApplication implements Application {
 
 	final void willTerminate (UIApplication uiApp) {
 		Gdx.app.debug("IOSApplication", "disposed");
+		audio.willTerminate();
 		graphics.makeCurrent();
 		Array<LifecycleListener> listeners = lifecycleListeners;
 		synchronized (listeners) {
@@ -367,7 +371,7 @@ public class IOSApplication implements Application {
 
 	@Override
 	public int getVersion () {
-		return (int) NSProcessInfo.getSharedProcessInfo().getOperatingSystemVersion().getMajorVersion();
+		return (int)NSProcessInfo.getSharedProcessInfo().getOperatingSystemVersion().getMajorVersion();
 	}
 
 	@Override
@@ -412,11 +416,7 @@ public class IOSApplication implements Application {
 			runnables.clear();
 		}
 		for (int i = 0; i < executedRunnables.size; i++) {
-			try {
-				executedRunnables.get(i).run();
-			} catch (Throwable t) {
-				t.printStackTrace();
-			}
+			executedRunnables.get(i).run();
 		}
 	}
 
@@ -431,6 +431,11 @@ public class IOSApplication implements Application {
 			@Override
 			public void setContents (String content) {
 				UIPasteboard.getGeneralPasteboard().setString(content);
+			}
+
+			@Override
+			public boolean hasContents () {
+				return UIPasteboard.getGeneralPasteboard().hasStrings();
 			}
 
 			@Override
@@ -454,7 +459,7 @@ public class IOSApplication implements Application {
 		}
 	}
 
-	/** Add a listener to handle events from the libgdx root view controller
+	/** Add a listener to handle events from the libGDX root view controller
 	 * @param listener The {#link IOSViewControllerListener} to add */
 	public void addViewControllerListener (IOSViewControllerListener listener) {
 		viewControllerListener = listener;

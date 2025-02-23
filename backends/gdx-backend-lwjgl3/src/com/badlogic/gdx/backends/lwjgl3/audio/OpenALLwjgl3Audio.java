@@ -1,12 +1,12 @@
 /*******************************************************************************
  * Copyright 2011 See AUTHORS file.
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *   http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -16,35 +16,22 @@
 
 package com.badlogic.gdx.backends.lwjgl3.audio;
 
-import static org.lwjgl.openal.AL10.AL_BUFFER;
-import static org.lwjgl.openal.AL10.AL_NO_ERROR;
-import static org.lwjgl.openal.AL10.AL_ORIENTATION;
-import static org.lwjgl.openal.AL10.AL_PAUSED;
-import static org.lwjgl.openal.AL10.AL_PLAYING;
-import static org.lwjgl.openal.AL10.AL_POSITION;
-import static org.lwjgl.openal.AL10.AL_SOURCE_STATE;
-import static org.lwjgl.openal.AL10.AL_STOPPED;
-import static org.lwjgl.openal.AL10.AL_VELOCITY;
-import static org.lwjgl.openal.AL10.alDeleteSources;
-import static org.lwjgl.openal.AL10.alGenSources;
-import static org.lwjgl.openal.AL10.alGetError;
-import static org.lwjgl.openal.AL10.alGetSourcei;
-import static org.lwjgl.openal.AL10.alListenerfv;
-import static org.lwjgl.openal.AL10.alSourcePause;
-import static org.lwjgl.openal.AL10.alSourcePlay;
-import static org.lwjgl.openal.AL10.alSourceStop;
-import static org.lwjgl.openal.AL10.alSourcei;
+import static org.lwjgl.openal.AL10.*;
 import static org.lwjgl.openal.ALC10.*;
+import static org.lwjgl.openal.EXTDisconnect.ALC_CONNECTED;
+import static org.lwjgl.openal.EnumerateAllExt.ALC_ALL_DEVICES_SPECIFIER;
 
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
+import java.util.Arrays;
+import java.util.List;
 
 import org.lwjgl.BufferUtils;
 import org.lwjgl.openal.AL;
 import org.lwjgl.openal.AL10;
 
-import com.badlogic.gdx.Audio;
 import com.badlogic.gdx.audio.AudioDevice;
 import com.badlogic.gdx.audio.AudioRecorder;
 import com.badlogic.gdx.files.FileHandle;
@@ -57,6 +44,11 @@ import com.badlogic.gdx.utils.LongMap;
 import com.badlogic.gdx.utils.ObjectMap;
 import org.lwjgl.openal.ALC;
 import org.lwjgl.openal.ALCCapabilities;
+import org.lwjgl.openal.ALUtil;
+import org.lwjgl.openal.SOFTDirectChannels;
+import org.lwjgl.openal.SOFTReopenDevice;
+import org.lwjgl.openal.SOFTXHoldOnDisconnect;
+import org.lwjgl.openal.SOFTDirectChannelsRemix;
 
 /** @author Nathan Sweet */
 public class OpenALLwjgl3Audio implements Lwjgl3Audio {
@@ -70,6 +62,8 @@ public class OpenALLwjgl3Audio implements Lwjgl3Audio {
 	private ObjectMap<String, Class<? extends OpenALMusic>> extensionToMusicClass = new ObjectMap();
 	private OpenALSound[] recentSounds;
 	private int mostRecetSound = -1;
+	private String preferredOutputDevice = null;
+	private Thread observerThread;
 
 	Array<OpenALMusic> music = new Array(false, 1, OpenALMusic.class);
 	long device;
@@ -109,6 +103,7 @@ public class OpenALLwjgl3Audio implements Lwjgl3Audio {
 		}
 		AL.createCapabilities(deviceCapabilities);
 
+		alGetError();
 		allSources = new IntArray(false, simultaneousSources);
 		for (int i = 0; i < simultaneousSources; i++) {
 			int sourceID = alGenSources();
@@ -116,16 +111,66 @@ public class OpenALLwjgl3Audio implements Lwjgl3Audio {
 			allSources.add(sourceID);
 		}
 		idleSources = new IntArray(allSources);
-		soundIdToSource = new LongMap<Integer>();
-		sourceToSoundId = new IntMap<Long>();
+		soundIdToSource = new LongMap<>();
+		sourceToSoundId = new IntMap<>();
 
-		FloatBuffer orientation = (FloatBuffer)BufferUtils.createFloatBuffer(6)
-			.put(new float[] {0.0f, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f}).flip();
+		FloatBuffer orientation = BufferUtils.createFloatBuffer(6).put(new float[] {0.0f, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f});
+		((Buffer)orientation).flip();
 		alListenerfv(AL_ORIENTATION, orientation);
-		FloatBuffer velocity = (FloatBuffer)BufferUtils.createFloatBuffer(3).put(new float[] {0.0f, 0.0f, 0.0f}).flip();
+		FloatBuffer velocity = BufferUtils.createFloatBuffer(3).put(new float[] {0.0f, 0.0f, 0.0f});
+		((Buffer)velocity).flip();
 		alListenerfv(AL_VELOCITY, velocity);
-		FloatBuffer position = (FloatBuffer)BufferUtils.createFloatBuffer(3).put(new float[] {0.0f, 0.0f, 0.0f}).flip();
+		FloatBuffer position = BufferUtils.createFloatBuffer(3).put(new float[] {0.0f, 0.0f, 0.0f});
+		((Buffer)position).flip();
 		alListenerfv(AL_POSITION, position);
+
+		alDisable(SOFTXHoldOnDisconnect.AL_STOP_SOURCES_ON_DISCONNECT_SOFT);
+		observerThread = new Thread(new Runnable() {
+
+			private String[] lastAvailableDevices = new String[0];
+
+			@Override
+			public void run () {
+				while (true) {
+					boolean isConnected = alcGetInteger(device, ALC_CONNECTED) != 0;
+					if (!isConnected) {
+						// The device is at a state where it can't recover
+						// This is usually the windows path on removing a device
+						switchOutputDevice(null, false);
+						continue;
+					}
+					if (preferredOutputDevice != null) {
+						if (Arrays.asList(getAvailableOutputDevices()).contains(preferredOutputDevice)) {
+							if (!preferredOutputDevice.equals(alcGetString(device, ALC_ALL_DEVICES_SPECIFIER))) {
+								// The preferred output device is reconnected, let's switch back to it
+								switchOutputDevice(preferredOutputDevice);
+							}
+						} else {
+							// This is usually the mac/linux path
+							if (preferredOutputDevice.equals(alcGetString(device, ALC_ALL_DEVICES_SPECIFIER))) {
+								// The preferred output device is reconnected, let's switch back to it
+								switchOutputDevice(null, false);
+							}
+						}
+					} else {
+						String[] currentDevices = getAvailableOutputDevices();
+						// If a new device got added, re evaluate "auto" mode
+						if (!Arrays.equals(currentDevices, lastAvailableDevices)) {
+							switchOutputDevice(null);
+						}
+						// Update last available devices
+						lastAvailableDevices = currentDevices;
+					}
+					try {
+						Thread.sleep(1000);
+					} catch (InterruptedException ignored) {
+						return;
+					}
+				}
+			}
+		});
+		observerThread.setDaemon(true);
+		observerThread.start();
 
 		recentSounds = new OpenALSound[simultaneousSources];
 	}
@@ -143,11 +188,21 @@ public class OpenALLwjgl3Audio implements Lwjgl3Audio {
 	}
 
 	public OpenALSound newSound (FileHandle file) {
+		String extension = file.extension().toLowerCase();
+		return newSound(file, extension);
+	}
+
+	public OpenALSound newSound (FileHandle file, String extension) {
 		if (file == null) throw new IllegalArgumentException("file cannot be null.");
-		Class<? extends OpenALSound> soundClass = extensionToSoundClass.get(file.extension().toLowerCase());
+		Class<? extends OpenALSound> soundClass = extensionToSoundClass.get(extension);
 		if (soundClass == null) throw new GdxRuntimeException("Unknown file extension for sound: " + file);
 		try {
-			return soundClass.getConstructor(new Class[] {OpenALLwjgl3Audio.class, FileHandle.class}).newInstance(this, file);
+			OpenALSound sound = soundClass.getConstructor(new Class[] {OpenALLwjgl3Audio.class, FileHandle.class}).newInstance(this,
+				file);
+			if (sound.getType() != null && !sound.getType().equals(extension)) {
+				return newSound(file, sound.getType());
+			}
+			return sound;
 		} catch (Exception ex) {
 			throw new GdxRuntimeException("Error creating sound " + soundClass.getName() + " for file: " + file, ex);
 		}
@@ -164,18 +219,36 @@ public class OpenALLwjgl3Audio implements Lwjgl3Audio {
 		}
 	}
 
+	@Override
+	public boolean switchOutputDevice (String deviceIdentifier) {
+		return switchOutputDevice(deviceIdentifier, true);
+	}
+
+	private boolean switchOutputDevice (String deviceIdentifier, boolean setPreferred) {
+		if (setPreferred) {
+			preferredOutputDevice = deviceIdentifier;
+		}
+		return SOFTReopenDevice.alcReopenDeviceSOFT(device, deviceIdentifier, (IntBuffer)null);
+	}
+
+	@Override
+	public String[] getAvailableOutputDevices () {
+		List<String> devices = ALUtil.getStringList(0, ALC_ALL_DEVICES_SPECIFIER);
+		if (devices == null) return new String[0];
+		return devices.toArray(new String[0]);
+	}
+
 	int obtainSource (boolean isMusic) {
 		if (noDevice) return 0;
 		for (int i = 0, n = idleSources.size; i < n; i++) {
 			int sourceId = idleSources.get(i);
 			int state = alGetSourcei(sourceId, AL_SOURCE_STATE);
 			if (state != AL_PLAYING && state != AL_PAUSED) {
+				Long oldSoundId = sourceToSoundId.remove(sourceId);
+				if (oldSoundId != null) soundIdToSource.remove(oldSoundId);
 				if (isMusic) {
 					idleSources.removeIndex(i);
 				} else {
-					Long oldSoundId = sourceToSoundId.remove(sourceId);
-					if (oldSoundId != null) soundIdToSource.remove(oldSoundId);
-
 					long soundId = nextSoundId++;
 					sourceToSoundId.put(sourceId, soundId);
 					soundIdToSource.put(soundId, sourceId);
@@ -185,6 +258,7 @@ public class OpenALLwjgl3Audio implements Lwjgl3Audio {
 				AL10.alSourcef(sourceId, AL10.AL_GAIN, 1);
 				AL10.alSourcef(sourceId, AL10.AL_PITCH, 1);
 				AL10.alSource3f(sourceId, AL10.AL_POSITION, 0, 0, 1f);
+				AL10.alSourcei(sourceId, SOFTDirectChannels.AL_DIRECT_CHANNELS_SOFT, SOFTDirectChannelsRemix.AL_REMIX_UNMATCHED_SOFT);
 				return sourceId;
 			}
 		}
@@ -301,6 +375,7 @@ public class OpenALLwjgl3Audio implements Lwjgl3Audio {
 
 	public void dispose () {
 		if (noDevice) return;
+		observerThread.interrupt();
 		for (int i = 0, n = allSources.size; i < n; i++) {
 			int sourceID = allSources.get(i);
 			int state = alGetSourcei(sourceID, AL_SOURCE_STATE);
@@ -308,8 +383,8 @@ public class OpenALLwjgl3Audio implements Lwjgl3Audio {
 			alDeleteSources(sourceID);
 		}
 
-		sourceToSoundId.clear();
-		soundIdToSource.clear();
+		sourceToSoundId = null;
+		soundIdToSource = null;
 
 		alcDestroyContext(context);
 		alcCloseDevice(device);
@@ -341,6 +416,14 @@ public class OpenALLwjgl3Audio implements Lwjgl3Audio {
 
 			@Override
 			public void dispose () {
+			}
+
+			@Override
+			public void pause () {
+			}
+
+			@Override
+			public void resume () {
 			}
 		};
 		return new OpenALAudioDevice(this, sampleRate, isMono, deviceBufferSize, deviceBufferCount);

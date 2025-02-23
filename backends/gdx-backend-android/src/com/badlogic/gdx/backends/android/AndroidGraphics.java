@@ -16,6 +16,9 @@
 
 package com.badlogic.gdx.backends.android;
 
+import android.annotation.TargetApi;
+import android.content.Context;
+import android.hardware.display.DisplayManager;
 import android.opengl.GLSurfaceView;
 import android.opengl.GLSurfaceView.EGLConfigChooser;
 import android.opengl.GLSurfaceView.Renderer;
@@ -25,6 +28,7 @@ import android.view.Display;
 import android.view.DisplayCutout;
 import android.view.View;
 import android.view.WindowManager.LayoutParams;
+import com.badlogic.gdx.AbstractGraphics;
 import com.badlogic.gdx.Application;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Graphics;
@@ -35,7 +39,7 @@ import com.badlogic.gdx.graphics.Cursor.SystemCursor;
 import com.badlogic.gdx.graphics.glutils.FrameBuffer;
 import com.badlogic.gdx.graphics.glutils.GLVersion;
 import com.badlogic.gdx.graphics.glutils.ShaderProgram;
-import com.badlogic.gdx.math.WindowedMean;
+import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.utils.GdxRuntimeException;
 import com.badlogic.gdx.utils.SnapshotArray;
 
@@ -48,7 +52,7 @@ import javax.microedition.khronos.opengles.GL10;
 /** An implementation of {@link Graphics} for Android.
  *
  * @author mzechner */
-public class AndroidGraphics implements Graphics, Renderer {
+public class AndroidGraphics extends AbstractGraphics implements Renderer {
 
 	private static final String LOG_TAG = "AndroidGraphics";
 
@@ -90,7 +94,7 @@ public class AndroidGraphics implements Graphics, Renderer {
 	private float density = 1;
 
 	protected final AndroidApplicationConfiguration config;
-	private BufferFormat bufferFormat = new BufferFormat(5, 6, 5, 0, 16, 0, 0, false);
+	private BufferFormat bufferFormat = new BufferFormat(8, 8, 8, 0, 16, 0, 0, false);
 	private boolean isContinuous = true;
 
 	public AndroidGraphics (AndroidApplicationBase application, AndroidApplicationConfiguration config,
@@ -114,8 +118,9 @@ public class AndroidGraphics implements Graphics, Renderer {
 		view.setPreserveEGLContextOnPause(true);
 	}
 
-	protected GLSurfaceView20 createGLSurfaceView (AndroidApplicationBase application, final ResolutionStrategy resolutionStrategy) {
-		if (!checkGL20()) throw new GdxRuntimeException("Libgdx requires OpenGL ES 2.0");
+	protected GLSurfaceView20 createGLSurfaceView (AndroidApplicationBase application,
+		final ResolutionStrategy resolutionStrategy) {
+		if (!checkGL20()) throw new GdxRuntimeException("libGDX requires OpenGL ES 2.0");
 
 		EGLConfigChooser configChooser = getEglConfigChooser();
 		GLSurfaceView20 view = new GLSurfaceView20(application.getContext(), resolutionStrategy, config.useGL30 ? 3 : 2);
@@ -213,6 +218,36 @@ public class AndroidGraphics implements Graphics, Renderer {
 		}
 	}
 
+	@Override
+	public boolean isGL31Available () {
+		return false;
+	}
+
+	@Override
+	public GL31 getGL31 () {
+		return null;
+	}
+
+	@Override
+	public void setGL31 (GL31 gl31) {
+
+	}
+
+	@Override
+	public boolean isGL32Available () {
+		return false;
+	}
+
+	@Override
+	public GL32 getGL32 () {
+		return null;
+	}
+
+	@Override
+	public void setGL32 (GL32 gl32) {
+
+	}
+
 	/** {@inheritDoc} */
 	@Override
 	public int getHeight () {
@@ -235,8 +270,8 @@ public class AndroidGraphics implements Graphics, Renderer {
 		return height;
 	}
 
-	/** This instantiates the GL10, GL11 and GL20 instances. Includes the check for certain devices that pretend to support GL11 but
-	 * fuck up vertex buffer objects. This includes the pixelflinger which segfaults when buffers are deleted as well as the
+	/** This instantiates the GL10, GL11 and GL20 instances. Includes the check for certain devices that pretend to support GL11
+	 * but fuck up vertex buffer objects. This includes the pixelflinger which segfaults when buffers are deleted as well as the
 	 * Motorola CLIQ and the Samsung Behold II.
 	 *
 	 * @param gl */
@@ -356,7 +391,7 @@ public class AndroidGraphics implements Graphics, Renderer {
 
 			view.queueEvent(new Runnable() {
 				@Override
-				public void run() {
+				public void run () {
 					if (!pause) {
 						// pause event already picked up by onDrawFrame
 						return;
@@ -412,7 +447,6 @@ public class AndroidGraphics implements Graphics, Renderer {
 		}
 		lastFrameTime = time;
 
-
 		boolean lrunning = false;
 		boolean lpause = false;
 		boolean ldestroy = false;
@@ -460,11 +494,7 @@ public class AndroidGraphics implements Graphics, Renderer {
 			}
 
 			for (int i = 0; i < app.getExecutedRunnables().size; i++) {
-				try {
-					app.getExecutedRunnables().get(i).run();
-				} catch (Throwable t) {
-					t.printStackTrace();
-				}
+				app.getExecutedRunnables().get(i).run();
 			}
 			app.getInput().processEvents();
 			frameId++;
@@ -511,11 +541,6 @@ public class AndroidGraphics implements Graphics, Renderer {
 	/** {@inheritDoc} */
 	@Override
 	public float getDeltaTime () {
-		return deltaTime;
-	}
-
-	@Override
-	public float getRawDeltaTime () {
 		return deltaTime;
 	}
 
@@ -607,7 +632,7 @@ public class AndroidGraphics implements Graphics, Renderer {
 
 	@Override
 	public Monitor[] getMonitors () {
-		return new Monitor[] { getPrimaryMonitor() };
+		return new Monitor[] {getPrimaryMonitor()};
 	}
 
 	@Override
@@ -625,7 +650,8 @@ public class AndroidGraphics implements Graphics, Renderer {
 		return new DisplayMode[] {getDisplayMode()};
 	}
 
-	protected void updateSafeAreaInsets() {
+	@TargetApi(Build.VERSION_CODES.P)
+	protected void updateSafeAreaInsets () {
 		safeInsetLeft = 0;
 		safeInsetTop = 0;
 		safeInsetRight = 0;
@@ -648,22 +674,22 @@ public class AndroidGraphics implements Graphics, Renderer {
 	}
 
 	@Override
-	public int getSafeInsetLeft() {
+	public int getSafeInsetLeft () {
 		return safeInsetLeft;
 	}
 
 	@Override
-	public int getSafeInsetTop() {
+	public int getSafeInsetTop () {
 		return safeInsetTop;
 	}
 
 	@Override
-	public int getSafeInsetBottom() {
+	public int getSafeInsetBottom () {
 		return safeInsetBottom;
 	}
 
 	@Override
-	public int getSafeInsetRight() {
+	public int getSafeInsetRight () {
 		return safeInsetRight;
 	}
 
@@ -690,9 +716,19 @@ public class AndroidGraphics implements Graphics, Renderer {
 
 	@Override
 	public DisplayMode getDisplayMode () {
+		Display display;
 		DisplayMetrics metrics = new DisplayMetrics();
-		app.getWindowManager().getDefaultDisplay().getMetrics(metrics);
-		return new AndroidDisplayMode(metrics.widthPixels, metrics.heightPixels, 0, 0);
+
+		DisplayManager displayManager = (DisplayManager)app.getContext().getSystemService(Context.DISPLAY_SERVICE);
+		display = displayManager.getDisplay(Display.DEFAULT_DISPLAY);
+		display.getRealMetrics(metrics); // Deprecated but no direct equivalent
+
+		int width = metrics.widthPixels;
+		int height = metrics.heightPixels;
+		int refreshRate = MathUtils.roundPositive(display.getRefreshRate());
+		int bitsPerPixel = config.r + config.g + config.b + config.a;
+
+		return new AndroidDisplayMode(width, height, refreshRate, bitsPerPixel);
 	}
 
 	@Override
@@ -702,6 +738,10 @@ public class AndroidGraphics implements Graphics, Renderer {
 
 	@Override
 	public void setVSync (boolean vsync) {
+	}
+
+	@Override
+	public void setForegroundFPS (int fps) {
 	}
 
 	@Override
@@ -737,7 +777,6 @@ public class AndroidGraphics implements Graphics, Renderer {
 		return true;
 	}
 
-
 	@Override
 	public Cursor newCursor (Pixmap pixmap, int xHotspot, int yHotspot) {
 		return null;
@@ -749,6 +788,8 @@ public class AndroidGraphics implements Graphics, Renderer {
 
 	@Override
 	public void setSystemCursor (SystemCursor systemCursor) {
+		View view = ((AndroidGraphics)app.getGraphics()).getView();
+		AndroidCursor.setSystemCursor(view, systemCursor);
 	}
 
 	private class AndroidDisplayMode extends DisplayMode {

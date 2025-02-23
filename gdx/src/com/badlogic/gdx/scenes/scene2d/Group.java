@@ -339,9 +339,10 @@ public class Group extends Actor implements Cullable {
 	 * @return the actor removed from this group. */
 	public Actor removeActorAt (int index, boolean unfocus) {
 		Actor actor = children.removeIndex(index);
-		if (unfocus) {
-			Stage stage = getStage();
-			if (stage != null) stage.unfocus(actor);
+		Stage stage = getStage();
+		if (stage != null) {
+			if (unfocus) stage.unfocus(actor);
+			stage.actorRemoved(actor);
 		}
 		actor.setParent(null);
 		actor.setStage(null);
@@ -349,11 +350,20 @@ public class Group extends Actor implements Cullable {
 		return actor;
 	}
 
-	/** Removes all actors from this group. */
+	/** Removes all actors from this group and unfocuses them. Calls {@link #clearChildren(boolean)} with true. */
 	public void clearChildren () {
+		clearChildren(true);
+	}
+
+	/** Removes all actors from this group. */
+	public void clearChildren (boolean unfocus) {
 		Actor[] actors = children.begin();
 		for (int i = 0, n = children.size; i < n; i++) {
 			Actor child = actors[i];
+			if (unfocus) {
+				Stage stage = getStage();
+				if (stage != null) stage.unfocus(child);
+			}
 			child.setStage(null);
 			child.setParent(null);
 		}
@@ -362,10 +372,16 @@ public class Group extends Actor implements Cullable {
 		childrenChanged();
 	}
 
-	/** Removes all children, actions, and listeners from this group. */
+	/** Removes all children, actions, and listeners from this group. The children are unfocused. */
 	public void clear () {
 		super.clear();
-		clearChildren();
+		clearChildren(true);
+	}
+
+	/** Removes all children, actions, and listeners from this group. */
+	public void clear (boolean unfocus) {
+		super.clear();
+		clearChildren(unfocus);
 	}
 
 	/** Returns the first actor found with the specified name. Note this recursively compares the name of every actor in the
@@ -436,11 +452,11 @@ public class Group extends Actor implements Cullable {
 		return transform;
 	}
 
-	/** Converts coordinates for this group to those of a descendant actor. The descendant does not need to be a direct child.
+	/** Converts coordinates for this group to those of a descendant actor. The descendant does not need to be an immediate child.
 	 * @throws IllegalArgumentException if the specified actor is not a descendant of this group. */
 	public Vector2 localToDescendantCoordinates (Actor descendant, Vector2 localCoords) {
 		Group parent = descendant.parent;
-		if (parent == null) throw new IllegalArgumentException("Child is not a descendant: " + descendant);
+		if (parent == null) throw new IllegalArgumentException("Actor is not a descendant: " + descendant);
 		// First convert to the actor's parent coordinates.
 		if (parent != this) localToDescendantCoordinates(parent, localCoords);
 		// Then from each parent down to the descendant.

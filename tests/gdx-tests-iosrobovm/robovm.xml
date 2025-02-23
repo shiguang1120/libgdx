@@ -2,7 +2,6 @@
   <executableName>${app.executable}</executableName>
   <mainClass>${app.mainclass}</mainClass>
   <os>ios</os>
-  <arch>thumbv7</arch>
   <target>ios</target>
   <iosInfoPList>Info.plist.xml</iosInfoPList>
   <treeShaker>conservative</treeShaker>
@@ -35,13 +34,20 @@
     <pattern>org.apache.harmony.security.provider.crypto.CryptoProvider</pattern>
   </forceLinkClasses>
   <libs>
-    <lib>../../gdx/libs/ios32/libgdx.a</lib>
-    <lib>../../gdx/libs/ios32/libObjectAL.a</lib>
-    <lib>../../extensions/gdx-freetype/libs/ios32/libgdx-freetype.a</lib>
-    <lib>../../extensions/gdx-bullet/libs/ios32/libgdx-bullet.a</lib>
-    <lib>../../extensions/gdx-box2d/gdx-box2d/libs/ios32/libgdx-box2d.a</lib>
   </libs>
+  <frameworkPaths>
+    <path>../../gdx/libs/ios32</path>
+    <path>../../extensions/gdx-freetype/libs/ios32</path>
+    <path>../../extensions/gdx-bullet/libs/ios32</path>
+    <path>../../extensions/gdx-box2d/gdx-box2d/libs/ios32</path>
+  </frameworkPaths>
   <frameworks>
+    <framework>gdx</framework>
+    <framework>ObjectAL</framework>
+    <framework>gdx-freetype</framework>
+    <framework>gdx-bullet</framework>
+    <framework>gdx-box2d</framework>
+    <!-- System Frameworks -->
     <framework>UIKit</framework>
     <framework>OpenGLES</framework>
     <framework>QuartzCore</framework>
@@ -49,5 +55,6 @@
     <framework>OpenAL</framework>
     <framework>AudioToolbox</framework>
     <framework>AVFoundation</framework>
+    <framework>GameController</framework>
   </frameworks>
 </config>

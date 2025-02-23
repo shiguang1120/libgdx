@@ -22,6 +22,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import com.badlogic.gdx.backends.lwjgl.audio.LwjglAudio;
+import com.badlogic.gdx.utils.*;
 import org.lwjgl.opengl.AWTGLCanvas;
 import org.lwjgl.opengl.Display;
 
@@ -36,10 +37,6 @@ import com.badlogic.gdx.LifecycleListener;
 import com.badlogic.gdx.Net;
 import com.badlogic.gdx.Preferences;
 import com.badlogic.gdx.backends.lwjgl.audio.OpenALLwjglAudio;
-import com.badlogic.gdx.utils.Array;
-import com.badlogic.gdx.utils.Clipboard;
-import com.badlogic.gdx.utils.Null;
-import com.badlogic.gdx.utils.SharedLibraryLoader;
 
 import java.awt.Canvas;
 import java.awt.Container;
@@ -58,7 +55,7 @@ public class LwjglCanvas implements LwjglApplicationBase {
 
 	LwjglGraphics graphics;
 	LwjglAudio audio;
-	LwjglFiles files;
+	Files files;
 	LwjglInput input;
 	LwjglNet net;
 	ApplicationListener listener;
@@ -96,7 +93,7 @@ public class LwjglCanvas implements LwjglApplicationBase {
 				scaleX = (float)transform.getScaleX();
 				scaleY = (float)transform.getScaleY();
 
-				if (SharedLibraryLoader.isMac) {
+				if (SharedLibraryLoader.os == Os.MacOsX) {
 					EventQueue.invokeLater(new Runnable() {
 						public void run () {
 							create();
@@ -146,7 +143,7 @@ public class LwjglCanvas implements LwjglApplicationBase {
 		};
 		graphics.setVSync(config.vSyncEnabled);
 		if (!LwjglApplicationConfiguration.disableAudio) audio = createAudio(config);
-		files = new LwjglFiles();
+		files = createFiles();
 		input = createInput(config);
 		net = new LwjglNet(config);
 		this.listener = listener;
@@ -240,7 +237,7 @@ public class LwjglCanvas implements LwjglApplicationBase {
 				}
 				try {
 					Display.processMessages();
-					if (cursor != null || !isWindows) canvas.setCursor(cursor);
+					applyCursor(cursor);
 
 					boolean shouldRender = checkResize();
 
@@ -288,6 +285,15 @@ public class LwjglCanvas implements LwjglApplicationBase {
 				return true;
 			}
 		});
+	}
+
+	protected void applyCursor (Cursor cursor) {
+		if (cursor != null || !isWindows) {
+			try {
+				canvas.setCursor(cursor);
+			} catch (Throwable ignored) { // Seems to fail on Linux sometimes.
+			}
+		}
 	}
 
 	public boolean executeRunnables () {
@@ -490,6 +496,10 @@ public class LwjglCanvas implements LwjglApplicationBase {
 	 * runnable later throws an exception. Default is false. */
 	public void setPostedRunnableStacktraces (boolean postedRunnableStacktraces) {
 		this.postedRunnableStacktraces = postedRunnableStacktraces;
+	}
+
+	protected Files createFiles () {
+		return new LwjglFiles();
 	}
 
 	@Override

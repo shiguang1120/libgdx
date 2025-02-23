@@ -25,6 +25,7 @@ import org.lwjgl.opengl.Display;
 
 import com.badlogic.gdx.ApplicationListener;
 
+import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.EventQueue;
 import java.awt.GraphicsConfiguration;
@@ -81,6 +82,11 @@ public class LwjglFrame extends JFrame {
 				updateSize(width, height);
 			}
 
+			protected void create () {
+				LwjglFrame.this.creating();
+				super.create();
+			}
+
 			protected void start () {
 				LwjglFrame.this.start();
 			}
@@ -100,6 +106,14 @@ public class LwjglFrame extends JFrame {
 			protected int getFrameRate () {
 				int frameRate = LwjglFrame.this.getFrameRate();
 				return frameRate == 0 ? super.getFrameRate() : frameRate;
+			}
+
+			public LwjglInput createInput (LwjglApplicationConfiguration config) {
+				return LwjglFrame.this.createInput(config);
+			}
+
+			protected void applyCursor (Cursor cursor) {
+				LwjglFrame.this.applyCursor(cursor);
 			}
 		};
 
@@ -138,9 +152,16 @@ public class LwjglFrame extends JFrame {
 			public void run () {
 				addCanvas();
 				setVisible(true);
-				lwjglCanvas.getCanvas().requestFocus();
+				try {
+					lwjglCanvas.getCanvas().requestFocus();
+				} catch (Throwable ignored) {
+					// Fails on Linux sometimes, seems shared lib isn't loaded for LinuxDisplay#callErrorHandler.
+				}
 			}
 		});
+	}
+
+	protected void creating () {
 	}
 
 	public void reshape (int x, int y, int width, int height) {
@@ -176,6 +197,10 @@ public class LwjglFrame extends JFrame {
 		return 0;
 	}
 
+	public LwjglInput createInput (LwjglApplicationConfiguration config) {
+		return new DefaultLwjglInput();
+	}
+
 	protected void exception (Throwable ex) {
 		ex.printStackTrace();
 		lwjglCanvas.stop();
@@ -203,6 +228,16 @@ public class LwjglFrame extends JFrame {
 
 	/** Called when the canvas size changes. */
 	public void updateSize (int width, int height) {
+	}
+
+	/** Called to set the cursor. */
+	protected void applyCursor (Cursor cursor) {
+		if (cursor != null || !LwjglCanvas.isWindows) {
+			try {
+				lwjglCanvas.canvas.setCursor(cursor);
+			} catch (Throwable ignored) { // Seems to fail on Linux sometimes.
+			}
+		}
 	}
 
 	/** Called after dispose is complete. */

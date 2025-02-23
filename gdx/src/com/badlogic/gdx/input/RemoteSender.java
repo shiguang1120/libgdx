@@ -23,8 +23,8 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input.Peripheral;
 import com.badlogic.gdx.InputProcessor;
 
-/** Sends all inputs from touch, key, accelerometer and compass to a {@link RemoteInput} at the given ip/port. Instantiate this and
- * call sendUpdate() periodically.
+/** Sends all inputs from touch, key, accelerometer and compass to a {@link RemoteInput} at the given ip/port. Instantiate this
+ * and call sendUpdate() periodically.
  * 
  * @author mzechner */
 public class RemoteSender implements InputProcessor {
@@ -171,6 +171,11 @@ public class RemoteSender implements InputProcessor {
 			}
 		}
 		return false;
+	}
+
+	@Override
+	public boolean touchCancelled (int screenX, int screenY, int pointer, int button) {
+		return touchUp(screenX, screenY, pointer, button);
 	}
 
 	@Override

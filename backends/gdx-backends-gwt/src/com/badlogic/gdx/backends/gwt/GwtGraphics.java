@@ -16,13 +16,15 @@
 
 package com.badlogic.gdx.backends.gwt;
 
+import com.badlogic.gdx.AbstractGraphics;
 import com.badlogic.gdx.Application;
 import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.Graphics;
 import com.badlogic.gdx.graphics.Cursor;
 import com.badlogic.gdx.graphics.Cursor.SystemCursor;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.GL30;
+import com.badlogic.gdx.graphics.GL31;
+import com.badlogic.gdx.graphics.GL32;
 import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.glutils.GLVersion;
 import com.badlogic.gdx.utils.GdxRuntimeException;
@@ -31,10 +33,11 @@ import com.google.gwt.dom.client.CanvasElement;
 import com.google.gwt.dom.client.Style;
 import com.google.gwt.user.client.Window;
 import com.google.gwt.user.client.ui.Panel;
+import com.google.gwt.webgl.client.WebGL2RenderingContext;
 import com.google.gwt.webgl.client.WebGLContextAttributes;
 import com.google.gwt.webgl.client.WebGLRenderingContext;
 
-public class GwtGraphics implements Graphics {
+public class GwtGraphics extends AbstractGraphics {
 
 	/* Enum values from http://www.w3.org/TR/screen-orientation. Filtered based on what the browsers actually support. */
 	public enum OrientationLockType {
@@ -55,8 +58,8 @@ public class GwtGraphics implements Graphics {
 	CanvasElement canvas;
 	WebGLRenderingContext context;
 	GLVersion glVersion;
-	GL20 gl;
-	String extensions;
+	private GL20 gl20;
+	private GL30 gl30;
 	float fps = 0;
 	long lastTimeStamp = System.currentTimeMillis();
 	long frameId = -1;
@@ -77,7 +80,7 @@ public class GwtGraphics implements Graphics {
 			int width = Window.getClientWidth() - config.padHorizontal;
 			int height = Window.getClientHeight() - config.padVertical;
 			double density = config.usePhysicalPixels ? getNativeScreenDensity() : 1;
-			setCanvasSize((int) (density * width), (int) (density * height));
+			setCanvasSize((int)(density * width), (int)(density * height));
 		} else {
 			setCanvasSize(config.width, config.height);
 		}
@@ -88,14 +91,27 @@ public class GwtGraphics implements Graphics {
 		attributes.setAlpha(config.alpha);
 		attributes.setPremultipliedAlpha(config.premultipliedAlpha);
 		attributes.setPreserveDrawingBuffer(config.preserveDrawingBuffer);
+		attributes.setXrCompatible(config.xrCompatible);
 
-		context = WebGLRenderingContext.getContext(canvas, attributes);
-		context.viewport(0, 0, config.width, config.height);
-		this.gl = config.useDebugGL ? new GwtGL20Debug(context) : new GwtGL20(context);
+		if (config.useGL30) {
+			// Check for WebGL2 support, and fall back to 1.0 if not supported.
+			context = WebGL2RenderingContext.getContext(canvas, attributes);
+		}
 
-		String versionString = gl.glGetString(GL20.GL_VERSION);
-		String vendorString = gl.glGetString(GL20.GL_VENDOR);
-		String rendererString = gl.glGetString(GL20.GL_RENDERER);
+		if (config.useGL30 && context != null) {
+			// WebGL2 supported
+			this.gl30 = config.useDebugGL ? new GwtGL30Debug((WebGL2RenderingContext)context)
+				: new GwtGL30((WebGL2RenderingContext)context);
+			this.gl20 = gl30;
+		} else {
+			context = WebGLRenderingContext.getContext(canvas, attributes);
+			this.gl20 = config.useDebugGL ? new GwtGL20Debug(context) : new GwtGL20(context);
+		}
+		context.viewport(0, 0, getWidth(), getHeight());
+
+		String versionString = gl20.glGetString(GL20.GL_VERSION);
+		String vendorString = gl20.glGetString(GL20.GL_VENDOR);
+		String rendererString = gl20.glGetString(GL20.GL_RENDERER);
 		glVersion = new GLVersion(Application.ApplicationType.WebGL, versionString, vendorString, rendererString);
 	}
 
@@ -105,31 +121,67 @@ public class GwtGraphics implements Graphics {
 
 	@Override
 	public GL20 getGL20 () {
-		return gl;
+		return gl20;
 	}
 
 	@Override
 	public void setGL20 (GL20 gl20) {
-		this.gl = gl20;
+		this.gl20 = gl20;
 		Gdx.gl = gl20;
 		Gdx.gl20 = gl20;
 	}
 
 	@Override
 	public boolean isGL30Available () {
-		return false;
+		return gl30 != null;
 	}
 
 	@Override
 	public GL30 getGL30 () {
-		return null;
+		return gl30;
 	}
 
 	@Override
 	public void setGL30 (GL30 gl30) {
+		this.gl30 = gl30;
+		if (gl30 != null) {
+			this.gl20 = gl30;
+
+			Gdx.gl = gl20;
+			Gdx.gl20 = gl20;
+			Gdx.gl30 = gl30;
+		}
+	}
+
+	@Override
+	public boolean isGL31Available () {
+		return false;
+	}
+
+	@Override
+	public GL31 getGL31 () {
+		return null;
+	}
+
+	@Override
+	public void setGL31 (GL31 gl31) {
 
 	}
 
+	@Override
+	public boolean isGL32Available () {
+		return false;
+	}
+
+	@Override
+	public GL32 getGL32 () {
+		return null;
+	}
+
+	@Override
+	public void setGL32 (GL32 gl32) {
+
+	}
 
 	@Override
 	public int getWidth () {
@@ -178,12 +230,12 @@ public class GwtGraphics implements Graphics {
 
 	@Override
 	public float getPpiX () {
-		return 96f * (float) getNativeScreenDensity();
+		return 96f * (float)getNativeScreenDensity();
 	}
 
 	@Override
 	public float getPpiY () {
-		return 96f * (float) getNativeScreenDensity();
+		return 96f * (float)getNativeScreenDensity();
 	}
 
 	@Override
@@ -230,6 +282,10 @@ public class GwtGraphics implements Graphics {
 		return $wnd.screen.height;
 	}-*/;
 
+	private native int getColorDepthJSNI () /*-{
+		return $wnd.screen.colorDepth;
+	}-*/;
+
 	private native boolean isFullscreenJSNI () /*-{
 		// Standards compliant check for fullscreen
 		if ("fullscreenElement" in $doc) {
@@ -269,7 +325,7 @@ public class GwtGraphics implements Graphics {
 		}
 	}
 
-	private native boolean setFullscreenJSNI(GwtGraphics graphics, CanvasElement element, int screenWidth, int screenHeight)/*-{
+	private native boolean setFullscreenJSNI (GwtGraphics graphics, CanvasElement element, int screenWidth, int screenHeight)/*-{
 		// Attempt to use the non-prefixed standard API (https://fullscreen.spec.whatwg.org)
 		if (element.requestFullscreen) {
 			element.width = screenWidth;
@@ -340,27 +396,27 @@ public class GwtGraphics implements Graphics {
 	@Override
 	public DisplayMode getDisplayMode () {
 		double density = config.usePhysicalPixels ? getNativeScreenDensity() : 1;
-		return new DisplayMode((int) (getScreenWidthJSNI() * density),
-				(int) (getScreenHeightJSNI() * density), 60, 8) {};
+		return new DisplayMode((int)(getScreenWidthJSNI() * density), (int)(getScreenHeightJSNI() * density), 60,
+			getColorDepthJSNI()) {};
 	}
 
 	@Override
-	public int getSafeInsetLeft() {
+	public int getSafeInsetLeft () {
 		return 0;
 	}
 
 	@Override
-	public int getSafeInsetTop() {
+	public int getSafeInsetTop () {
 		return 0;
 	}
 
 	@Override
-	public int getSafeInsetBottom() {
+	public int getSafeInsetBottom () {
 		return 0;
 	}
 
 	@Override
-	public int getSafeInsetRight() {
+	public int getSafeInsetRight () {
 		return 0;
 	}
 
@@ -381,7 +437,7 @@ public class GwtGraphics implements Graphics {
 		return true;
 	}
 
-	void setCanvasSize(int width, int height) {
+	void setCanvasSize (int width, int height) {
 		canvas.setWidth(width);
 		canvas.setHeight(height);
 
@@ -391,7 +447,6 @@ public class GwtGraphics implements Graphics {
 			canvas.getStyle().setHeight(height / density, Style.Unit.PX);
 		}
 	}
-
 
 	@Override
 	public Monitor getPrimaryMonitor () {
@@ -405,7 +460,7 @@ public class GwtGraphics implements Graphics {
 
 	@Override
 	public Monitor[] getMonitors () {
-		return new Monitor[] { getPrimaryMonitor() };
+		return new Monitor[] {getPrimaryMonitor()};
 	}
 
 	@Override
@@ -501,8 +556,9 @@ public class GwtGraphics implements Graphics {
 	}
 
 	@Override
-	public void setTitle (String title) {
-	}
+	public native void setTitle (String title) /*-{
+		$wnd.document.title = title;
+	}-*/;
 
 	@Override
 	public void setUndecorated (boolean undecorated) {
@@ -517,18 +573,15 @@ public class GwtGraphics implements Graphics {
 	}
 
 	@Override
-	public float getDensity () {
-		return (getPpiX()) / 160;
+	public void setForegroundFPS (int fps) {
 	}
 
-	/**
-	 * See https://developer.mozilla.org/en-US/docs/Web/API/Window/devicePixelRatio for more information
+	/** See https://developer.mozilla.org/en-US/docs/Web/API/Window/devicePixelRatio for more information
 	 *
-	 * @return value indicating the ratio of the display's resolution in physical pixels to the resolution in CSS
-	 * pixels. A value of 1 indicates a classic 96 DPI (76 DPI on some platforms) display, while a value of 2
-	 * is expected for HiDPI/Retina displays.
-	 */
-	public static native double getNativeScreenDensity() /*-{
+	 * @return value indicating the ratio of the display's resolution in physical pixels to the resolution in CSS pixels. A value
+	 *         of 1 indicates a classic 96 DPI (76 DPI on some platforms) display, while a value of 2 is expected for HiDPI/Retina
+	 *         displays. */
+	public static native double getNativeScreenDensity () /*-{
 		return $wnd.devicePixelRatio || 1;
 	}-*/;
 
@@ -543,11 +596,6 @@ public class GwtGraphics implements Graphics {
 
 	@Override
 	public void requestRendering () {
-	}
-
-	@Override
-	public float getRawDeltaTime () {
-		return getDeltaTime();
 	}
 
 	@Override

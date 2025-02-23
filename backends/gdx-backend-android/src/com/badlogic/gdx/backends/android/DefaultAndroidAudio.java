@@ -48,36 +48,22 @@ public class DefaultAndroidAudio implements AndroidAudio {
 	private final List<AndroidMusic> musics = new ArrayList<AndroidMusic>();
 
 	public DefaultAndroidAudio (Context context, AndroidApplicationConfiguration config) {
-		if (!config.disableAudio) {
-			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-				AudioAttributes audioAttrib = new AudioAttributes.Builder()
-						.setUsage(AudioAttributes.USAGE_GAME)
-						.setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-						.build();
-				soundPool = new SoundPool.Builder().setAudioAttributes(audioAttrib).setMaxStreams(config.maxSimultaneousSounds).build();
-			}else {
-				soundPool = new SoundPool(config.maxSimultaneousSounds, AudioManager.STREAM_MUSIC, 0);// srcQuality: the sample-rate converter quality. Currently has no effect. Use 0 for the default.
-			}
-			manager = (AudioManager)context.getSystemService(Context.AUDIO_SERVICE);
-			if (context instanceof Activity) {
-				((Activity)context).setVolumeControlStream(AudioManager.STREAM_MUSIC);
-			}
-		} else {
-			soundPool = null;
-			manager = null;
+		AudioAttributes audioAttrib = new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_GAME)
+			.setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build();
+		soundPool = new SoundPool.Builder().setAudioAttributes(audioAttrib).setMaxStreams(config.maxSimultaneousSounds).build();
+		manager = (AudioManager)context.getSystemService(Context.AUDIO_SERVICE);
+		if (context instanceof Activity) {
+			((Activity)context).setVolumeControlStream(AudioManager.STREAM_MUSIC);
 		}
 	}
 
 	@Override
 	public void pause () {
-		if (soundPool == null) {
-			return;
-		}
 		synchronized (musics) {
 			for (AndroidMusic music : musics) {
 				if (music.isPlaying()) {
 					music.pause();
-					music.wasPlaying = true;					
+					music.wasPlaying = true;
 				} else
 					music.wasPlaying = false;
 			}
@@ -87,9 +73,6 @@ public class DefaultAndroidAudio implements AndroidAudio {
 
 	@Override
 	public void resume () {
-		if (soundPool == null) {
-			return;
-		}
 		synchronized (musics) {
 			for (int i = 0; i < musics.size(); i++) {
 				if (musics.get(i).wasPlaying) musics.get(i).play();
@@ -101,21 +84,15 @@ public class DefaultAndroidAudio implements AndroidAudio {
 	/** {@inheritDoc} */
 	@Override
 	public AudioDevice newAudioDevice (int samplingRate, boolean isMono) {
-		if (soundPool == null) {
-			throw new GdxRuntimeException("Android audio is not enabled by the application config.");
-		}
 		return new AndroidAudioDevice(samplingRate, isMono);
 	}
 
 	/** {@inheritDoc} */
 	@Override
 	public Music newMusic (FileHandle file) {
-		if (soundPool == null) {
-			throw new GdxRuntimeException("Android audio is not enabled by the application config.");
-		}
 		AndroidFileHandle aHandle = (AndroidFileHandle)file;
 
-		MediaPlayer mediaPlayer = new MediaPlayer();
+		MediaPlayer mediaPlayer = createMediaPlayer();
 
 		if (aHandle.type() == FileType.Internal) {
 			try {
@@ -129,8 +106,8 @@ public class DefaultAndroidAudio implements AndroidAudio {
 				}
 				return music;
 			} catch (Exception ex) {
-				throw new GdxRuntimeException("Error loading audio file: " + file
-					+ "\nNote: Internal audio files must be placed in the assets directory.", ex);
+				throw new GdxRuntimeException(
+					"Error loading audio file: " + file + "\nNote: Internal audio files must be placed in the assets directory.", ex);
 			}
 		} else {
 			try {
@@ -148,19 +125,24 @@ public class DefaultAndroidAudio implements AndroidAudio {
 
 	}
 
+	@Override
+	public boolean switchOutputDevice (String deviceIdentifier) {
+		return true;
+	}
+
+	@Override
+	public String[] getAvailableOutputDevices () {
+		return new String[0];
+	}
+
 	/** Creates a new Music instance from the provided FileDescriptor. It is the caller's responsibility to close the file
 	 * descriptor. It is safe to do so as soon as this call returns.
 	 * 
 	 * @param fd the FileDescriptor from which to create the Music
 	 * 
-	 * @see Audio#newMusic(FileHandle)
-	 */
+	 * @see Audio#newMusic(FileHandle) */
 	public Music newMusic (FileDescriptor fd) {
-		if (soundPool == null) {
-			throw new GdxRuntimeException("Android audio is not enabled by the application config.");
-		}
-		
-		MediaPlayer mediaPlayer = new MediaPlayer();
+		MediaPlayer mediaPlayer = createMediaPlayer();
 
 		try {
 			mediaPlayer.setDataSource(fd);
@@ -175,13 +157,10 @@ public class DefaultAndroidAudio implements AndroidAudio {
 			throw new GdxRuntimeException("Error loading audio from FileDescriptor", ex);
 		}
 	}
-	
+
 	/** {@inheritDoc} */
 	@Override
 	public Sound newSound (FileHandle file) {
-		if (soundPool == null) {
-			throw new GdxRuntimeException("Android audio is not enabled by the application config.");
-		}
 		AndroidSound androidSound;
 		AndroidFileHandle aHandle = (AndroidFileHandle)file;
 		if (aHandle.type() == FileType.Internal) {
@@ -190,8 +169,8 @@ public class DefaultAndroidAudio implements AndroidAudio {
 				androidSound = new AndroidSound(soundPool, manager, soundPool.load(descriptor, 1));
 				descriptor.close();
 			} catch (IOException ex) {
-				throw new GdxRuntimeException("Error loading audio file: " + file
-					+ "\nNote: Internal audio files must be placed in the assets directory.", ex);
+				throw new GdxRuntimeException(
+					"Error loading audio file: " + file + "\nNote: Internal audio files must be placed in the assets directory.", ex);
 			}
 		} else {
 			try {
@@ -202,22 +181,16 @@ public class DefaultAndroidAudio implements AndroidAudio {
 		}
 		return androidSound;
 	}
-	
+
 	/** {@inheritDoc} */
 	@Override
 	public AudioRecorder newAudioRecorder (int samplingRate, boolean isMono) {
-		if (soundPool == null) {
-			throw new GdxRuntimeException("Android audio is not enabled by the application config.");
-		}
 		return new AndroidAudioRecorder(samplingRate, isMono);
 	}
 
 	/** Kills the soundpool and all other resources */
 	@Override
 	public void dispose () {
-		if (soundPool == null) {
-			return;
-		}
 		synchronized (musics) {
 			// gah i hate myself.... music.dispose() removes the music from the list...
 			ArrayList<AndroidMusic> musicsCopy = new ArrayList<AndroidMusic>(musics);
@@ -233,5 +206,16 @@ public class DefaultAndroidAudio implements AndroidAudio {
 		synchronized (musics) {
 			musics.remove(this);
 		}
+	}
+
+	protected MediaPlayer createMediaPlayer () {
+		MediaPlayer mediaPlayer = new MediaPlayer();
+		if (Build.VERSION.SDK_INT <= 21) {
+			mediaPlayer.setAudioStreamType(AudioManager.STREAM_MUSIC);
+		} else {
+			mediaPlayer.setAudioAttributes(new AudioAttributes.Builder().setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+				.setUsage(AudioAttributes.USAGE_GAME).build());
+		}
+		return mediaPlayer;
 	}
 }

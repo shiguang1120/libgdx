@@ -1,3 +1,4 @@
+
 package com.badlogic.gdx.tests.utils;
 
 import static java.lang.annotation.ElementType.TYPE;
@@ -10,4 +11,10 @@ import java.lang.annotation.Target;
 @Target(TYPE)
 public @interface GdxTestConfig {
 	boolean requireGL30() default false;
+
+	boolean requireGL31() default false;
+
+	boolean requireGL32() default false;
+
+	boolean OnlyGL20() default false;
 }

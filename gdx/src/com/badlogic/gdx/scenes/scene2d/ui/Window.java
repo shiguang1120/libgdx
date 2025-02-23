@@ -68,7 +68,7 @@ public class Window extends Table {
 		setTouchable(Touchable.enabled);
 		setClip(true);
 
-		titleLabel = new Label(title, new LabelStyle(style.titleFont, style.titleFontColor));
+		titleLabel = newLabel(title, new LabelStyle(style.titleFont, style.titleFontColor));
 		titleLabel.setEllipsis(true);
 
 		titleTable = new Table() {
@@ -76,7 +76,7 @@ public class Window extends Table {
 				if (drawTitleTable) super.draw(batch, parentAlpha);
 			}
 		};
-		titleTable.add(titleLabel).expandX().fillX().minWidth(0);
+		titleTable.add(titleLabel).growX().minWidth(0);
 		addActor(titleTable);
 
 		setStyle(style);
@@ -192,6 +192,10 @@ public class Window extends Table {
 				return isModal;
 			}
 		});
+	}
+
+	protected Label newLabel (String text, LabelStyle style) {
+		return new Label(text, style);
 	}
 
 	public void setStyle (WindowStyle style) {
@@ -354,10 +358,10 @@ public class Window extends Table {
 		}
 
 		public WindowStyle (WindowStyle style) {
-			background = style.background;
 			titleFont = style.titleFont;
 			if (style.titleFontColor != null) titleFontColor = new Color(style.titleFontColor);
 			background = style.background;
+			stageBackground = style.stageBackground;
 		}
 	}
 }

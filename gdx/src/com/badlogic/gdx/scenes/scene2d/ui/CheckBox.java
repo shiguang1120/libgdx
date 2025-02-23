@@ -41,12 +41,21 @@ public class CheckBox extends TextButton {
 
 	public CheckBox (@Null String text, CheckBoxStyle style) {
 		super(text, style);
-		clearChildren();
+
 		Label label = getLabel();
-		imageCell = add(image = new Image(style.checkboxOff, Scaling.none));
-		add(label);
 		label.setAlignment(Align.left);
+
+		image = newImage();
+		image.setDrawable(style.checkboxOff);
+
+		clearChildren();
+		imageCell = add(image);
+		add(label);
 		setSize(getPrefWidth(), getPrefHeight());
+	}
+
+	protected Image newImage () {
+		return new Image((Drawable)null, Scaling.none);
 	}
 
 	public void setStyle (ButtonStyle style) {
@@ -62,24 +71,20 @@ public class CheckBox extends TextButton {
 	}
 
 	public void draw (Batch batch, float parentAlpha) {
-		Drawable checkbox = null;
-		if (isDisabled()) {
-			if (isChecked && style.checkboxOnDisabled != null)
-				checkbox = style.checkboxOnDisabled;
-			else
-				checkbox = style.checkboxOffDisabled;
-		}
-		if (checkbox == null) {
-			boolean over = isOver() && !isDisabled();
-			if (isChecked && style.checkboxOn != null)
-				checkbox = over && style.checkboxOnOver != null ? style.checkboxOnOver : style.checkboxOn;
-			else if (over && style.checkboxOver != null)
-				checkbox = style.checkboxOver;
-			else
-				checkbox = style.checkboxOff;
-		}
-		image.setDrawable(checkbox);
+		image.setDrawable(getImageDrawable());
 		super.draw(batch, parentAlpha);
+	}
+
+	protected @Null Drawable getImageDrawable () {
+		if (isDisabled()) {
+			if (isChecked && style.checkboxOnDisabled != null) return style.checkboxOnDisabled;
+			return style.checkboxOffDisabled;
+		}
+		boolean over = isOver() && !isDisabled();
+		if (isChecked && style.checkboxOn != null)
+			return over && style.checkboxOnOver != null ? style.checkboxOnOver : style.checkboxOn;
+		if (over && style.checkboxOver != null) return style.checkboxOver;
+		return style.checkboxOff;
 	}
 
 	public Image getImage () {

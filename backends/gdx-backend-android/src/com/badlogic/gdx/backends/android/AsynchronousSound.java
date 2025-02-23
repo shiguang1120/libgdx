@@ -1,3 +1,4 @@
+
 package com.badlogic.gdx.backends.android;
 
 import android.os.Handler;
@@ -81,7 +82,12 @@ public class AsynchronousSound implements Sound {
 
 	@Override
 	public void stop () {
-		sound.stop();
+		handler.post(new Runnable() {
+			@Override
+			public void run () {
+				sound.stop();
+			}
+		});
 	}
 
 	@Override

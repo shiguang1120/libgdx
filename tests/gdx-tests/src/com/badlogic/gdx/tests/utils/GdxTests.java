@@ -38,9 +38,9 @@ import java.util.List;
 
 import com.badlogic.gdx.tests.*;
 import com.badlogic.gdx.tests.bench.TiledMapBench;
+import com.badlogic.gdx.tests.conformance.AudioSoundAndMusicIsolationTest;
 import com.badlogic.gdx.tests.conformance.DisplayModeTest;
 import com.badlogic.gdx.tests.examples.MoveSpriteExample;
-import com.badlogic.gdx.tests.extensions.ControllersTest;
 import com.badlogic.gdx.tests.extensions.FreeTypeAtlasTest;
 import com.badlogic.gdx.tests.extensions.FreeTypeDisposeTest;
 import com.badlogic.gdx.tests.extensions.FreeTypeFontLoaderTest;
@@ -58,8 +58,8 @@ import com.badlogic.gdx.tests.g3d.FogTest;
 import com.badlogic.gdx.tests.g3d.FrameBufferCubemapTest;
 import com.badlogic.gdx.tests.g3d.HeightMapTest;
 import com.badlogic.gdx.tests.g3d.LightsTest;
-import com.badlogic.gdx.tests.g3d.MaterialTest;
 import com.badlogic.gdx.tests.g3d.MaterialEmissiveTest;
+import com.badlogic.gdx.tests.g3d.MaterialTest;
 import com.badlogic.gdx.tests.g3d.MeshBuilderTest;
 import com.badlogic.gdx.tests.g3d.ModelCacheTest;
 import com.badlogic.gdx.tests.g3d.ModelTest;
@@ -70,14 +70,34 @@ import com.badlogic.gdx.tests.g3d.PolarAccelerationTest;
 import com.badlogic.gdx.tests.g3d.ShaderCollectionTest;
 import com.badlogic.gdx.tests.g3d.ShaderTest;
 import com.badlogic.gdx.tests.g3d.ShadowMappingTest;
+import com.badlogic.gdx.tests.g3d.ShadowMappingTextureTest;
 import com.badlogic.gdx.tests.g3d.SkeletonTest;
 import com.badlogic.gdx.tests.g3d.TangentialAccelerationTest;
 import com.badlogic.gdx.tests.g3d.TextureArrayTest;
 import com.badlogic.gdx.tests.g3d.TextureRegion3DTest;
 import com.badlogic.gdx.tests.g3d.utils.DefaultTextureBinderTest;
+import com.badlogic.gdx.tests.gles2.GlTexImage2D;
 import com.badlogic.gdx.tests.gles2.HelloTriangle;
 import com.badlogic.gdx.tests.gles2.SimpleVertexShader;
+import com.badlogic.gdx.tests.gles2.VertexArrayTest;
+import com.badlogic.gdx.tests.gles3.GL30Texture3DTest;
 import com.badlogic.gdx.tests.gles3.InstancedRenderingTest;
+import com.badlogic.gdx.tests.gles3.ModelInstancedRenderingTest;
+import com.badlogic.gdx.tests.gles3.NonPowerOfTwoTest;
+import com.badlogic.gdx.tests.gles3.PixelBufferObjectTest;
+import com.badlogic.gdx.tests.gles3.UniformBufferObjectsTest;
+import com.badlogic.gdx.tests.gles31.GL31FrameBufferMultisampleMRTTest;
+import com.badlogic.gdx.tests.gles31.GL31FrameBufferMultisampleTest;
+import com.badlogic.gdx.tests.gles31.GL31IndirectDrawingIndexedTest;
+import com.badlogic.gdx.tests.gles31.GL31IndirectDrawingNonIndexedTest;
+import com.badlogic.gdx.tests.gles31.GL31ProgramIntrospectionTest;
+import com.badlogic.gdx.tests.gles32.GL32AdvancedBlendingTest;
+import com.badlogic.gdx.tests.gles32.GL32DebugControlTest;
+import com.badlogic.gdx.tests.gles32.GL32MultipleRenderTargetsBlendingTest;
+import com.badlogic.gdx.tests.gles32.GL32OffsetElementsTest;
+import com.badlogic.gdx.tests.math.CollisionPlaygroundTest;
+import com.badlogic.gdx.tests.math.OctreeTest;
+import com.badlogic.gdx.tests.math.collision.OrientedBoundingBoxTest;
 import com.badlogic.gdx.tests.net.NetAPITest;
 import com.badlogic.gdx.tests.superkoalio.SuperKoalio;
 import com.badlogic.gdx.utils.ObjectMap;
@@ -88,7 +108,7 @@ import com.badlogic.gdx.utils.StreamUtils;
  * @author badlogicgames@gmail.com */
 public class GdxTests {
 	public static final List<Class<? extends GdxTest>> tests = new ArrayList<Class<? extends GdxTest>>(Arrays.asList(
-		// @off
+	// @off
 		IssueTest.class,
 		AccelerometerTest.class,
 		ActionSequenceTest.class,
@@ -101,8 +121,10 @@ public class GdxTests {
 		AnnotationTest.class,
 		AssetManagerTest.class,
 		AtlasIssueTest.class,
+		AudioChangeDeviceTest.class,
 		AudioDeviceTest.class,
 		AudioRecorderTest.class,
+		AudioSoundAndMusicIsolationTest.class,
 		Basic3DSceneTest.class,
 		Basic3DTest.class,
 		Benchmark3DTest.class,
@@ -121,6 +143,7 @@ public class GdxTests {
 		BulletTestCollection.class,
 		ClipboardTest.class,
 		CollectionsTest.class,
+		CollisionPlaygroundTest.class,
 		ColorTest.class,
 		ContainerTest.class,
 		CoordinatesTest.class,
@@ -148,10 +171,20 @@ public class GdxTests {
 		FrameBufferTest.class,
 		FramebufferToTextureTest.class,
 		FullscreenTest.class,
-		ControllersTest.class,
 		Gdx2DTest.class,
 		GestureDetectorTest.class,
+		GL30Texture3DTest.class,
 		GLES30Test.class,
+		GL31IndirectDrawingIndexedTest.class,
+		GL31IndirectDrawingNonIndexedTest.class,
+		GL31FrameBufferMultisampleMRTTest.class,
+		GL31FrameBufferMultisampleTest.class,
+		GL31ProgramIntrospectionTest.class,
+		GL32AdvancedBlendingTest.class,
+		GL32DebugControlTest.class,
+		GL32MultipleRenderTargetsBlendingTest.class,
+		GL32OffsetElementsTest.class,
+		GlTexImage2D.class,
 		GLProfilerErrorTest.class,
 		GroupCullingTest.class,
 		GroupFadeTest.class,
@@ -183,9 +216,11 @@ public class GdxTests {
 		MatrixJNITest.class,
 		MeshBuilderTest.class,
 		MeshShaderTest.class,
+		MeshWithCustomAttributesTest.class,
 		MipMapTest.class,
 		ModelTest.class,
 		ModelCacheTest.class,
+		ModelInstancedRenderingTest.class,
 		MoveSpriteExample.class,
 		MultipleRenderTargetTest.class,
 		MultitouchTest.class,
@@ -193,7 +228,11 @@ public class GdxTests {
 		NetAPITest.class,
 		NinePatchTest.class,
 		NoncontinuousRenderingTest.class,
+		NonPowerOfTwoTest.class,
+		OctreeTest.class,
 		OnscreenKeyboardTest.class,
+		NativeInputTest.class,
+		OrientedBoundingBoxTest.class,
 		PathTest.class,
 		ParallaxTest.class,
 		ParticleControllerInfluencerSingleTest.class,
@@ -201,6 +240,7 @@ public class GdxTests {
 		ParticleEmitterTest.class,
 		ParticleEmittersTest.class,
 		ParticleEmitterChangeSpriteTest.class,
+		PixelBufferObjectTest.class,
 		PixelsPerInchTest.class,
 		PixmapBlendingTest.class,
 		PixmapPackerTest.class,
@@ -228,6 +268,7 @@ public class GdxTests {
 		ShaderMultitextureTest.class,
 		ShaderTest.class,
 		ShadowMappingTest.class,
+		ShadowMappingTextureTest.class,
 		ShapeRendererTest.class,
 		ShapeRendererAlphaTest.class,
 		SimpleAnimationTest.class,
@@ -239,6 +280,7 @@ public class GdxTests {
 		SortedSpriteTest.class,
 		SoundTest.class,
 		SpriteBatchRotationTest.class,
+		SpriteBatchPerformanceTest.class,
 		SpriteBatchShaderTest.class,
 		SpriteBatchTest.class,
 		SpriteCacheOffsetTest.class,
@@ -247,6 +289,7 @@ public class GdxTests {
 		StagePerformanceTest.class,
 		StageTest.class,
 		SuperKoalio.class,
+		SystemCursorTest.class,
 		TableLayoutTest.class,
 		TableTest.class,
 		TangentialAccelerationTest.class,
@@ -263,24 +306,35 @@ public class GdxTests {
 		TextureRegion3DTest.class,
 		TideMapAssetManagerTest.class,
 		TideMapDirectLoaderTest.class,
+		TiledDrawableTest.class,
 		TileTest.class,
 		TiledMapAnimationLoadingTest.class,
 		TiledMapAssetManagerTest.class,
 		TiledMapGroupLayerTest.class,
+		TiledMapGroupLayerWithImagelayerTest.class,
 		TiledMapAtlasAssetManagerTest.class,
 		TiledMapDirectLoaderTest.class,
+		TiledMapImageLayerRepeatTest.class,
 		TiledMapModifiedExternalTilesetTest.class,
 		TiledMapObjectLoadingTest.class,
+		TiledMapObjectPropertyTest.class,
 		TiledMapBench.class,
 		TiledMapLayerOffsetTest.class,
+		TiledMapLayerTintOpacityTest.class,
+		TiledMapPropertiesTest.class,
+		TiledMapJsonFormatTest.class,
+		TiledMapJsonObjectLoadingTest.class,
 		TimerTest.class,
 		TimeUtilsTest.class,
 		TouchpadTest.class,
 		TreeTest.class,
 		UISimpleTest.class,
 		UITest.class,
+		UniformBufferObjectsTest.class,
+		UtfFontTest.class,
 		VBOWithVAOPerformanceTest.class,
 		Vector2dTest.class,
+		VertexArrayTest.class,
 		VertexBufferObjectShaderTest.class,
 		VibratorTest.class,
 		ViewportTest1.class,
@@ -296,12 +350,14 @@ public class GdxTests {
 		FreeTypeTest.class,
 		InternationalFontsTest.class,
 		PngTest.class,
-		JsonTest.class
+		JsonTest.class,
+		QuadTreeFloatTest.class,
+		QuadTreeFloatNearestTest.class
 		// @on
 
-		// SoundTouchTest.class, Mpg123Test.class, WavTest.class, FreeTypeTest.class,
-		// VorbisTest.class
-		));
+	// SoundTouchTest.class, Mpg123Test.class, WavTest.class, FreeTypeTest.class,
+	// VorbisTest.class
+	));
 
 	static final ObjectMap<String, String> obfuscatedToOriginal = new ObjectMap();
 	static final ObjectMap<String, String> originalToObfuscated = new ObjectMap();

@@ -17,7 +17,6 @@
 package com.badlogic.gdx.tests;
 
 import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.Input;
 import com.badlogic.gdx.Input.Buttons;
 import com.badlogic.gdx.Input.Keys;
 import com.badlogic.gdx.InputProcessor;
@@ -31,17 +30,17 @@ public class InputTest extends GdxTest implements InputProcessor {
 		Gdx.input.setInputProcessor(this);
 // Gdx.input.setCursorCatched(true);
 //
-//		Gdx.input.getTextInput(new Input.TextInputListener() {
-//			@Override
-//			public void input(String text) {
-//				Gdx.app.log("Input test", "Input value: " + text);
-//			}
+// Gdx.input.getTextInput(new Input.TextInputListener() {
+// @Override
+// public void input(String text) {
+// Gdx.app.log("Input test", "Input value: " + text);
+// }
 //
-//			@Override
-//			public void canceled() {
-//				Gdx.app.log("Input test", "Canceled input text");
-//			}
-//		}, "Title", "Text", "Placeholder");
+// @Override
+// public void canceled() {
+// Gdx.app.log("Input test", "Canceled input text");
+// }
+// }, "Title", "Text", "Placeholder");
 	}
 
 	@Override
@@ -49,8 +48,7 @@ public class InputTest extends GdxTest implements InputProcessor {
 		if (Gdx.input.justTouched()) {
 			Gdx.app.log("Input Test", "just touched, button: " + (Gdx.input.isButtonPressed(Buttons.LEFT) ? "left " : "")
 				+ (Gdx.input.isButtonPressed(Buttons.MIDDLE) ? "middle " : "")
-				+ (Gdx.input.isButtonPressed(Buttons.RIGHT) ? "right" : "")
-				+ (Gdx.input.isButtonPressed(Buttons.BACK) ? "back" : "")
+				+ (Gdx.input.isButtonPressed(Buttons.RIGHT) ? "right" : "") + (Gdx.input.isButtonPressed(Buttons.BACK) ? "back" : "")
 				+ (Gdx.input.isButtonPressed(Buttons.FORWARD) ? "forward" : ""));
 		}
 

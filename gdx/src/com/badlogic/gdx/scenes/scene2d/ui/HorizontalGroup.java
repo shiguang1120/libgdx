@@ -124,8 +124,8 @@ public class HorizontalGroup extends WidgetGroup {
 		}
 		prefHeight += padTop + padBottom;
 		if (round) {
-			prefWidth = Math.round(prefWidth);
-			prefHeight = Math.round(prefHeight);
+			prefWidth = (float)Math.ceil(prefWidth);
+			prefHeight = (float)Math.ceil(prefHeight);
 		}
 	}
 
@@ -193,7 +193,7 @@ public class HorizontalGroup extends WidgetGroup {
 				y += (rowHeight - height) / 2;
 
 			if (round)
-				child.setBounds(Math.round(x), Math.round(y), Math.round(width), Math.round(height));
+				child.setBounds((float)Math.floor(x), (float)Math.floor(y), (float)Math.ceil(width), (float)Math.ceil(height));
 			else
 				child.setBounds(x, y, width, height);
 			x += width + space;
@@ -256,6 +256,7 @@ public class HorizontalGroup extends WidgetGroup {
 			}
 
 			if (x + width > groupWidth || r == 0) {
+				r = Math.min(r, rowSizes.size - 2); // In case an actor changed size without invalidating this layout.
 				x = xStart;
 				if ((align & Align.right) != 0)
 					x += maxWidth - rowSizes.get(r);
@@ -282,7 +283,7 @@ public class HorizontalGroup extends WidgetGroup {
 				y += (rowHeight - height) / 2;
 
 			if (round)
-				child.setBounds(Math.round(x), Math.round(y), Math.round(width), Math.round(height));
+				child.setBounds((float)Math.floor(x), (float)Math.floor(y), (float)Math.ceil(width), (float)Math.ceil(height));
 			else
 				child.setBounds(x, y, width, height);
 			x += width + space;
@@ -300,6 +301,11 @@ public class HorizontalGroup extends WidgetGroup {
 	public float getPrefHeight () {
 		if (sizeInvalid) computeSize();
 		return prefHeight;
+	}
+
+	/** When wrapping is enabled, the number of rows may be > 1. */
+	public int getRows () {
+		return wrap ? rowSizes.size >> 1 : 1;
 	}
 
 	/** If true (the default), positions and sizes are rounded to integers. */

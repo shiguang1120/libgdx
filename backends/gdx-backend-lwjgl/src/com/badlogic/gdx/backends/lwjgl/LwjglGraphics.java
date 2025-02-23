@@ -18,10 +18,13 @@ package com.badlogic.gdx.backends.lwjgl;
 
 import java.awt.Canvas;
 import java.awt.Toolkit;
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 
+import com.badlogic.gdx.AbstractGraphics;
 import com.badlogic.gdx.Application;
 import com.badlogic.gdx.graphics.glutils.GLVersion;
+import com.badlogic.gdx.utils.Os;
 import org.lwjgl.LWJGLException;
 import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.ContextAttribs;
@@ -31,10 +34,11 @@ import org.lwjgl.opengl.PixelFormat;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Graphics;
-import com.badlogic.gdx.graphics.Cursor;
 import com.badlogic.gdx.graphics.Cursor.SystemCursor;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.GL30;
+import com.badlogic.gdx.graphics.GL31;
+import com.badlogic.gdx.graphics.GL32;
 import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.Pixmap.Blending;
 import com.badlogic.gdx.graphics.Pixmap.Format;
@@ -44,7 +48,7 @@ import com.badlogic.gdx.utils.SharedLibraryLoader;
 
 /** An implementation of the {@link Graphics} interface based on Lwjgl.
  * @author mzechner */
-public class LwjglGraphics implements Graphics {
+public class LwjglGraphics extends AbstractGraphics {
 
 	/** The suppored OpenGL extensions */
 	static Array<String> extensions;
@@ -118,10 +122,6 @@ public class LwjglGraphics implements Graphics {
 		return deltaTime;
 	}
 
-	public float getRawDeltaTime () {
-		return deltaTime;
-	}
-
 	/** The delta time for the next frame will be 0. This can be useful if the render thread was blocked for some time to prevent
 	 * game state or animations from advancing. */
 	public void resetDeltaTime () {
@@ -159,8 +159,28 @@ public class LwjglGraphics implements Graphics {
 	}
 
 	@Override
+	public boolean isGL31Available () {
+		return false;
+	}
+
+	@Override
+	public boolean isGL32Available () {
+		return false;
+	}
+
+	@Override
 	public GL30 getGL30 () {
 		return gl30;
+	}
+
+	@Override
+	public GL31 getGL31 () {
+		return null;
+	}
+
+	@Override
+	public GL32 getGL32 () {
+		return null;
 	}
 
 	@Override
@@ -173,6 +193,14 @@ public class LwjglGraphics implements Graphics {
 			Gdx.gl20 = gl20;
 			Gdx.gl30 = gl30;
 		}
+	}
+
+	@Override
+	public void setGL31 (GL31 gl31) {
+	}
+
+	@Override
+	public void setGL32 (GL32 gl32) {
 	}
 
 	public int getFramesPerSecond () {
@@ -215,7 +243,7 @@ public class LwjglGraphics implements Graphics {
 				DisplayMode bestMode = null;
 				for (DisplayMode mode : getDisplayModes()) {
 					if (mode.width == config.width && mode.height == config.height) {
-						if (bestMode == null || bestMode.refreshRate < this.getDisplayMode().refreshRate) {
+						if (bestMode == null || bestMode.refreshRate < mode.refreshRate) {
 							bestMode = mode;
 						}
 					}
@@ -249,7 +277,7 @@ public class LwjglGraphics implements Graphics {
 						pixmap = rgba;
 					}
 					icons[i] = ByteBuffer.allocateDirect(pixmap.getPixels().limit());
-					icons[i].put(pixmap.getPixels()).flip();
+					((Buffer)icons[i].put(pixmap.getPixels())).flip();
 					pixmap.dispose();
 				}
 				Display.setIcon(icons);
@@ -307,6 +335,22 @@ public class LwjglGraphics implements Graphics {
 		// FBO is in core since OpenGL 3.0, see https://www.opengl.org/wiki/Framebuffer_Object
 		return glVersion.isVersionEqualToOrHigher(3, 0) || extensions.contains("GL_EXT_framebuffer_object", false)
 			|| extensions.contains("GL_ARB_framebuffer_object", false);
+	}
+
+	/** @return whether cubemap seamless feature is supported. */
+	public static boolean supportsCubeMapSeamless () {
+		return glVersion.isVersionEqualToOrHigher(3, 2) || extensions.contains("GL_ARB_seamless_cube_map", false);
+	}
+
+	/** Enable or disable cubemap seamless feature. Default is true if supported. Should only be called if this feature is
+	 * supported. (see {@link #supportsCubeMapSeamless()})
+	 * @param enable */
+	public void enableCubeMapSeamless (boolean enable) {
+		if (enable) {
+			gl20.glEnable(org.lwjgl.opengl.GL32.GL_TEXTURE_CUBE_MAP_SEAMLESS);
+		} else {
+			gl20.glDisable(org.lwjgl.opengl.GL32.GL_TEXTURE_CUBE_MAP_SEAMLESS);
+		}
 	}
 
 	private void createDisplayPixelFormat (boolean useGL30, int gles30ContextMajor, int gles30ContextMinor) {
@@ -402,6 +446,10 @@ public class LwjglGraphics implements Graphics {
 		Gdx.gl = gl20;
 		Gdx.gl20 = gl20;
 		Gdx.gl30 = gl30;
+
+		if (supportsCubeMapSeamless()) {
+			enableCubeMapSeamless(true);
+		}
 	}
 
 	@Override
@@ -416,18 +464,18 @@ public class LwjglGraphics implements Graphics {
 
 	@Override
 	public float getPpcX () {
-		return (Toolkit.getDefaultToolkit().getScreenResolution() / 2.54f);
+		return getPpiX() / 2.54f;
 	}
 
 	@Override
 	public float getPpcY () {
-		return (Toolkit.getDefaultToolkit().getScreenResolution() / 2.54f);
+		return getPpiY() / 2.54f;
 	}
 
 	@Override
 	public float getDensity () {
 		if (config.overrideDensity != -1) return config.overrideDensity / 160f;
-		return (Toolkit.getDefaultToolkit().getScreenResolution() / 160f);
+		return super.getDensity();
 	}
 
 	@Override
@@ -625,6 +673,15 @@ public class LwjglGraphics implements Graphics {
 		Display.setVSyncEnabled(vsync);
 	}
 
+	/** Sets the target framerate for the application, when using continuous rendering. Must be positive. The cpu sleeps as needed.
+	 * Use 0 to never sleep. Default is 60.
+	 *
+	 * @param fps fps */
+	@Override
+	public void setForegroundFPS (int fps) {
+		this.config.foregroundFPS = fps;
+	}
+
 	@Override
 	public boolean supportsExtension (String extension) {
 		return extensions.contains(extension, false);
@@ -680,7 +737,7 @@ public class LwjglGraphics implements Graphics {
 
 	@Override
 	public void setCursor (com.badlogic.gdx.graphics.Cursor cursor) {
-		if (canvas != null && SharedLibraryLoader.isMac) {
+		if (canvas != null && SharedLibraryLoader.os == Os.MacOsX) {
 			return;
 		}
 		try {
@@ -692,7 +749,7 @@ public class LwjglGraphics implements Graphics {
 
 	@Override
 	public void setSystemCursor (SystemCursor systemCursor) {
-		if (canvas != null && SharedLibraryLoader.isMac) {
+		if (canvas != null && SharedLibraryLoader.os == Os.MacOsX) {
 			return;
 		}
 		try {
